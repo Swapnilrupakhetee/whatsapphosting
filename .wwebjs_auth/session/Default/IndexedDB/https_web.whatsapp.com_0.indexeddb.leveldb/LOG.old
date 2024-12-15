@@ -1,0 +1,19 @@
+2024/12/15-21:29:56.402 2090 Reusing MANIFEST D:\Axis projects\whatsappi-api2\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2024/12/15-21:29:56.402 2090 Recovering log #95
+2024/12/15-21:29:56.440 2090 Reusing old log D:\Axis projects\whatsappi-api2\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000095.log 
+2024/12/15-21:29:58.088 d4c Level-0 table #103: started
+2024/12/15-21:29:58.209 d4c Level-0 table #103: 309364 bytes OK
+2024/12/15-21:29:58.399 d4c Delete type=0 #95
+2024/12/15-21:29:58.399 d4c Manual compaction at level-0 from '\x00\x1d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x1e\x00\x00\x00' @ 0 : 0; will stop at (end)
+2024/12/15-21:29:58.420 d4c Compacting 1@1 + 4@2 files
+2024/12/15-21:29:59.163 d4c Generated table #104@1: 24620 keys, 2179831 bytes
+2024/12/15-21:29:59.361 d4c Generated table #105@1: 4331 keys, 2157276 bytes
+2024/12/15-21:29:59.525 d4c Generated table #106@1: 44185 keys, 2220221 bytes
+2024/12/15-21:29:59.726 d4c Generated table #107@1: 54448 keys, 1171725 bytes
+2024/12/15-21:29:59.726 d4c Compacted 1@1 + 4@2 files => 7729053 bytes
+2024/12/15-21:29:59.774 d4c compacted to: files[ 0 0 4 0 0 0 0 ]
+2024/12/15-21:29:59.775 d4c Delete type=2 #97
+2024/12/15-21:29:59.775 d4c Delete type=2 #98
+2024/12/15-21:29:59.775 d4c Delete type=2 #99
+2024/12/15-21:29:59.775 d4c Delete type=2 #100
+2024/12/15-21:29:59.775 d4c Delete type=2 #103
