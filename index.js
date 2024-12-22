@@ -35,7 +35,7 @@ client.on("auth_failure", (msg) => {
 // Function to generate random delay between 30-60 seconds
 // Function to generate random delay between 2-5 minutes
 function getRandomDelay() {
-  return Math.floor(Math.random() * (300000 - 120000 + 1)) + 120000; // 120,000 ms = 2 minutes, 300,000 ms = 5 minutes
+  return Math.floor(Math.random() * (30000 - 12000 + 1)) + 12000; // 120,000 ms = 2 minutes, 300,000 ms = 5 minutes
 }
 
 // Client is ready

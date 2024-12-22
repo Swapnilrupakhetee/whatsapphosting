@@ -1,0 +1,6 @@
+.payment-reminder-container{
+    overflow: hidden;
+    display: flex;
+    width: fit-content;
+    padding-left: 5.5rem;
+}

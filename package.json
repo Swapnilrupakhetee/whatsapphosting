@@ -12,6 +12,8 @@
   "dependencies": {
     "dotenv": "^8.6.0",
     "qrcode-terminal": "^0.12.0",
+    "react-icons": "^5.4.0",
+    "react-pro-sidebar": "^1.1.0",
     "whatsapp-web.js": "^1.26.0"
   }
 }
