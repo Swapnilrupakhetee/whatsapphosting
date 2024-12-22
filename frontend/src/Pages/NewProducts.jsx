@@ -6,6 +6,10 @@ import {
   } from "@mui/icons-material";
 import FileUpload from '../Components/FileUpload';
 const NewProducts = () => {
+    const handleFileUpload = (files) => {
+        console.log('New Products Files:', files);
+      };
+    
   return (
     <>
     <div className='payment-reminder-container'>
@@ -15,7 +19,11 @@ const NewProducts = () => {
       New Products <NewReleases />
       </div>
         <div className='drop-file'>
-        <FileUpload/>
+        <FileUpload
+        onFileUpload={handleFileUpload}
+        acceptedFiles=".xlsx"
+        storageKey="newProductsFile"
+      />
         </div>
         </div>
     </div>
