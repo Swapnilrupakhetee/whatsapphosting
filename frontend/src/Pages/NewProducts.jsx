@@ -1,9 +1,9 @@
 import React from 'react';
-
+import '../Styles/PaymentReminder.css';
 const NewProducts = () => {
   return (
     <>
-    <div>
+      <div className='payment-reminder-container'>
       New products
     </div>
     </>
