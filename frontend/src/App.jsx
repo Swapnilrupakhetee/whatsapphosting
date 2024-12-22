@@ -10,7 +10,7 @@ function App() {
       <div className="main-container">
         <Admin />
         <Routes>
-        <Route exact path="/" element={<Admin />} />
+        <Route exact path="/" element={<PaymentReminder />} />
         <Route exact path="/payment-reminder" element={<PaymentReminder />} />
         <Route exact path="new-product" element={<NewProducts/>} />
 

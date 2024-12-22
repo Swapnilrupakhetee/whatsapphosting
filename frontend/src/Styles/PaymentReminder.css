@@ -1,9 +1,16 @@
 .payment-reminder-container{
     overflow: hidden;
     display: flex;
+    
     width: 100%;
     background-color: rgb(244, 244, 244);
    padding: 0px 10px;
+}
+.payment-reminder-content{
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-direction: column;
 }
 .payment-reminder-title{
     display: flex;
@@ -12,4 +19,8 @@
     justify-content: center;
     align-items: center;
     font-size: 1.5rem;
+}
+.drop-file{
+    margin-top: 1rem;
+
 }
