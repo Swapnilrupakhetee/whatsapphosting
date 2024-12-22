@@ -4,7 +4,6 @@ import { FaEye, FaUserAlt, FaBars } from "react-icons/fa";
 import { PiWallFill } from "react-icons/pi";
 import {
   NotificationsActive,
-  AttachMoney,
   NewReleases,
 } from "@mui/icons-material";
 import { Link } from "react-router-dom";

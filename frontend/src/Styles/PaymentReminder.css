@@ -1,6 +1,15 @@
 .payment-reminder-container{
     overflow: hidden;
     display: flex;
-    width: fit-content;
+    width: 100%;
+    background-color: rgb(244, 244, 244);
    padding: 0px 10px;
+}
+.payment-reminder-title{
+    display: flex;
+    height: fit-content;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
 }
