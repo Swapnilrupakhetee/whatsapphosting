@@ -92,3 +92,21 @@
 .collapsed + .main-content {
   margin-left: 80px;
 }
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5); /* Adjust the opacity for desired darkness */
+  z-index: 999; /* Make sure it overlays the content but not the sidebar */
+  transition: opacity 0.3s ease;
+}
+.sidebar-wrapper {
+  position: relative;
+}
+
+.sidebar-container {
+  position: relative;
+  z-index: 1000; /* Ensure it sits above the overlay */
+}
