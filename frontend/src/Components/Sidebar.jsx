@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import "../Styles/Sidebar.css";
 
 const SidebarAdmin = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const handleToggle = () => {
     setCollapsed(!collapsed);
