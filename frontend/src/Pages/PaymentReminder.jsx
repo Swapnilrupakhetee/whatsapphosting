@@ -28,7 +28,7 @@ const PaymentReminder = () => {
               readOnly
             />
           </div>
-          <div className="send-message-button">Send Message</div>
+          <div className="send-message-button">Send Messages</div>
         </div>
       </div>
     </>
