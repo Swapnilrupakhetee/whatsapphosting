@@ -11,8 +11,10 @@
     justify-content: flex-start;
     align-items: flex-start;
     flex-direction: column;
+    width:90%;
 }
 .payment-reminder-title{
+    margin-top: 5px;
     display: flex;
     height: fit-content;
     gap: 10px;
@@ -23,4 +25,51 @@
 .drop-file{
     margin-top: 1rem;
 
+}
+.textarea-container{
+    margin-top: 1rem;
+    width: 100%;
+}
+.textarea-container textarea{
+    max-width: 700px;
+    padding: 5px;
+    width: 600px;
+    min-height: 150px;
+    border: 1px dashed #4caf50;
+    overflow: hidden;
+    border-radius: 10px;
+}
+.textarea-container.active{
+    border: 1px solid #4caf50;
+}
+.send-message-button{
+    margin-top: 1rem;
+    background-color: #4caf50;
+    border-radius: 7px;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: 0.3s ease-in-out;
+}
+
+.send-message-button:hover{
+    background-color: #35bd3a;
+    transition: 0.3s ease-in-out;
+}
+.image-upload-container{
+    margin: 1rem 0rem;
+}
+@media (min-width:00px) and (max-width:700px) {
+    .textarea-container textarea{
+        max-width: 700px;
+        padding: 5px;
+        width: 100%;
+        min-height: 150px;
+        border: 1px dashed #4caf50;
+        overflow: hidden;
+        border-radius: 10px;
+    }
+    
 }
