@@ -1,18 +1,20 @@
 import React, { useState } from "react";
 import { Sidebar, Menu, MenuItem } from "react-pro-sidebar";
-import { FaEye, FaUserAlt, FaBars } from "react-icons/fa";
-import { PiWallFill } from "react-icons/pi";
+import { FaBars } from "react-icons/fa";
 import { NotificationsActive, NewReleases } from "@mui/icons-material";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import "../Styles/Sidebar.css";
 
 const SidebarAdmin = () => {
   const [collapsed, setCollapsed] = useState(true);
+  const location = useLocation(); // To track the current path
 
   const handleToggle = () => {
     setCollapsed(!collapsed);
   };
+
+  const isActive = (path) => location.pathname === path;
 
   return (
     <div className="sidebar-wrapper">
@@ -24,20 +26,34 @@ const SidebarAdmin = () => {
                 <FaBars />
               </button>
             </div>
-            <Link to={"/payment-reminder"} className="links">
-              <MenuItem className="menu-item">
+            <Link to="/payment-reminder" className="links">
+              <MenuItem
+                className={`menu-item ${isActive("/payment-reminder") ? "active" : ""}`}
+              >
                 <div className="sidebar-items">
-                  <NotificationsActive className="sidebar-icon" />
+                  <NotificationsActive
+                    className="sidebar-icon"
+                    style={{
+                      color: isActive("/payment-reminder") ? "#4caf50" : "inherit",
+                    }}
+                  />
                   <span className="menu-text">
                     {!collapsed && "Payment Reminder"}
                   </span>
                 </div>
               </MenuItem>
             </Link>
-            <Link to={"new-product"} className="links">
-              <MenuItem className="menu-item">
+            <Link to="/new-product" className="links">
+              <MenuItem
+                className={`menu-item ${isActive("/new-product") ? "active" : ""}`}
+              >
                 <div className="sidebar-items">
-                  <NewReleases className="sidebar-icon" />
+                  <NewReleases
+                    className="sidebar-icon"
+                    style={{
+                      color: isActive("/new-product") ? "#4caf50" : "inherit",
+                    }}
+                  />
                   <span className="menu-text">
                     {!collapsed && "New Products"}
                   </span>
