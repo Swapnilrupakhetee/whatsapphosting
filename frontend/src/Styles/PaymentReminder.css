@@ -53,6 +53,10 @@
     cursor: pointer;
     transition: 0.3s ease-in-out;
 }
+.file-icon {
+    font-size: 24px;
+    color: #4caf50;
+  }
 
 .send-message-button:hover{
     background-color: #35bd3a;

@@ -12,33 +12,35 @@ app.use(bodyParser.json());
 
 let client = null;
 let qrCodeData = null;
+let isInitializing = false;
+let isClientReady = false;  // Track if the client is ready to send messages
 
-const initializeWhatsApp = () => {
-  return new Promise((resolve, reject) => {
-    if (client) {
-      // If client exists but we have qrCodeData, something's wrong - reset
-      if (qrCodeData) {
-        client.destroy();
-        client = null;
-      } else {
-        resolve(client);
-        return;
-      }
-    }
+// Initialize WhatsApp Client
+const initializeWhatsApp = async () => {
+  if (isInitializing) {
+    throw new Error('WhatsApp client is already initializing');
+  }
 
+  if (client) {
+    return client;
+  }
+
+  isInitializing = true;
+  qrCodeData = null;
+
+  try {
     client = new Client({
       puppeteer: {
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      }
+      },
     });
 
-    // Set up event handlers
     client.on('qr', async (qr) => {
+      console.log('Received QR code event');
       try {
-        console.log('Received QR code event');
         qrCodeData = await qrcode.toDataURL(qr);
-        console.log('Successfully converted QR to data URL');
+        console.log('QR code generated successfully');
       } catch (err) {
         console.error('QR Generation Error:', err);
         qrCodeData = null;
@@ -47,80 +49,147 @@ const initializeWhatsApp = () => {
 
     client.on('ready', () => {
       console.log('WhatsApp Client is ready!');
-      qrCodeData = null;
-      resolve(client);
+      isClientReady = true;  // Set client as ready
     });
 
     client.on('auth_failure', (msg) => {
       console.error('AUTHENTICATION FAILED:', msg);
-      qrCodeData = null;
-      client = null;
-      reject(new Error('WhatsApp authentication failed'));
+      resetClient();
     });
 
     client.on('disconnected', (reason) => {
       console.log('Client was disconnected:', reason);
-      qrCodeData = null;
-      client = null;
+      resetClient();
     });
 
-    client.initialize().catch(error => {
-      console.error('Failed to initialize client:', error);
-      qrCodeData = null;
-      client = null;
-      reject(error);
-    });
-  });
+    await client.initialize();
+    return client;
+  } catch (error) {
+    console.error('Failed to initialize client:', error);
+    resetClient();
+    throw error;
+  } finally {
+    isInitializing = false;
+  }
 };
 
+// Reset WhatsApp client
+const resetClient = async () => {
+  if (client) {
+    await client.destroy();  // Ensure the client is destroyed and fully disconnected
+    client = null;
+    qrCodeData = null;
+    isClientReady = false;  // Reset client readiness
+    console.log('WhatsApp client destroyed and session ended');
+  }
+};
+
+// Endpoint to generate QR code
 app.get('/api/generate-qr', async (req, res) => {
   console.log('QR code generation request received');
-  
   try {
-    if (client) {
-      console.log('Destroying existing client...');
-      await client.destroy();
-      client = null;
-      qrCodeData = null;
+    if (!client) {
+      console.log('Initializing WhatsApp client...');
+      await initializeWhatsApp();
     }
 
-    console.log('Initializing WhatsApp client...');
-    await initializeWhatsApp();
-    
-    console.log('Waiting for QR code...');
     let attempts = 0;
-    const maxAttempts = 30; // Increased to 30 attempts
-    
-    while (!qrCodeData && attempts < maxAttempts) {
-      console.log(`Attempt ${attempts + 1}/${maxAttempts} to get QR code`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      attempts++;
+    const maxAttempts = 30;
+    const waitTime = 1000; // 1 second
 
-      // If we have a QR code, send it immediately
-      if (qrCodeData) {
-        console.log('QR code generated successfully');
-        return res.json({
-          success: true,
-          qrCode: qrCodeData
-        });
-      }
+    while (!qrCodeData && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      attempts++;
     }
 
-    // If we get here, we timed out
-    console.error('QR code generation timed out');
-    res.status(500).json({
-      success: false,
-      error: 'QR code generation timeout'
-    });
+    if (qrCodeData) {
+      return res.json({
+        success: true,
+        qrCode: qrCodeData,
+      });
+    } else {
+      resetClient();
+      return res.status(408).json({
+        success: false,
+        error: 'QR code generation timeout',
+      });
+    }
   } catch (error) {
     console.error('Error in QR generation:', error);
+    resetClient();
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate QR code'
+      error: error.message || 'Failed to generate QR code',
     });
   }
 });
 
+// Check client status
+app.get('/api/client-status', (req, res) => {
+  res.json({
+    success: true,
+    isReady: isClientReady
+  });
+});
+
+// Send messages endpoint
+app.post('/api/send-messages', async (req, res) => {
+  if (!isClientReady) {
+    return res.status(400).json({ success: false, error: 'WhatsApp client is not ready yet. Please scan the QR code.' });
+  }
+
+  if (!client || !client.info) {
+    return res.status(400).json({ success: false, error: 'WhatsApp client not initialized' });
+  }
+
+  const { messages } = req.body;
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid message data' });
+  }
+
+  try {
+    const results = await Promise.all(messages.map(async (msg) => {
+      const { country_code, number, name, daysLate, outstandingAmount } = msg;
+      const fullNumber = `${country_code}${number}@c.us`;
+      const message = `Dear ${name}, this is a reminder that your payment of NPR ${outstandingAmount} is ${daysLate} days late. Please make the payment as soon as possible.`;
+
+      // Generate random delay between 2 and 5 minutes (in milliseconds)
+      const randomDelay = Math.floor(Math.random() * (30000 - 12000 + 1)) + 14000;  // 2-5 minutes
+
+      // Wait for the random delay before sending the message
+      await new Promise(resolve => setTimeout(resolve, randomDelay));
+
+      try {
+        await client.sendMessage(fullNumber, message);
+        return { success: true, number: fullNumber };
+      } catch (error) {
+        console.error(`Failed to send message to ${fullNumber}:`, error);
+        return { success: false, number: fullNumber, error: error.message };
+      }
+    }));
+
+    // After sending all messages, reset the client after a 10-second delay
+    setTimeout(async () => {
+      console.log("Closing WhatsApp connection after 10 seconds...");
+      await resetClient(); // Close the connection
+    }, 10000); // 10 seconds
+
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Error sending messages:', error);
+    resetClient();  // Reset client in case of error
+    res.status(500).json({ success: false, error: 'Failed to send messages' });
+  }
+});
+
+// Reset the WhatsApp client
+app.get('/api/reset', (req, res) => {
+  resetClient();
+  res.json({ success: true, message: 'Client reset successfully' });
+});
+
+// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

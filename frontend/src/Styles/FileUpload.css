@@ -33,4 +33,10 @@
     font-weight: bold;
     color: #333;
   }
-  
+  .file-info{
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    
+  }
