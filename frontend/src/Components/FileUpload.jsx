@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { FaFileExcel } from 'react-icons/fa';
 import '../Styles/FileUpload.css';
 
-function FileUpload({ onFileUpload, acceptedFiles, storageKey }) {
+function FileUpload({ onFileUpload, storageKey }) {
   const [uploadedFile, setUploadedFile] = useState(() => {
     const savedFile = localStorage.getItem(storageKey);
     return savedFile ? JSON.parse(savedFile) : null;
@@ -27,7 +27,11 @@ function FileUpload({ onFileUpload, acceptedFiles, storageKey }) {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: acceptedFiles,
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls']
+    },
+    maxFiles: 1
   });
 
   useEffect(() => {
@@ -38,15 +42,22 @@ function FileUpload({ onFileUpload, acceptedFiles, storageKey }) {
   }, [storageKey]);
 
   return (
-    <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>
+    <div 
+      {...getRootProps()} 
+      className={`dropzone ${isDragActive ? 'active' : ''}`}
+    >
       <input {...getInputProps()} />
       {uploadedFile ? (
-        <div className="file-display">
-          <FaFileExcel className="file-icon" />
-          <span className="file-name">{uploadedFile.name}</span>
+        <div className="file-info">
+          <FaFileExcel className="excel-icon" />
+          <span>{uploadedFile.name}</span>
         </div>
       ) : (
-        <p>Drag 'n' drop an .xlsx file here, or click to select a file</p>
+        <div className="upload-prompt">
+          <FaFileExcel className="excel-icon" />
+          <p>Drag 'n' drop an Excel file here, or click to select a file</p>
+          <small>(.xlsx or .xls files only)</small>
+        </div>
       )}
     </div>
   );
