@@ -14,8 +14,10 @@ const NewProducts = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState('');
     const [error, setError] = useState('');
+    const [categories, setCategories] = useState([]);
     const [isClientReady, setIsClientReady] = useState(false);
     const [qrCode, setQrCode] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
 
     const fileInputRef = useRef(null);
     const API_URL = 'http://localhost:5000';
@@ -23,30 +25,69 @@ const NewProducts = () => {
     const handleFileUpload = (files) => {
         const file = files[0];
         const reader = new FileReader();
-
+    
         reader.onload = (e) => {
             const data = e.target.result;
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-            const formattedData = jsonData.map((row) => ({
-                country_code: row.country_code?.toString(),
-                number: row.number?.toString(),
-                name: row.name,
-                product_name: row.product_name,
-                product_price: parseFloat(row.product_price),
-            }));
-
-            setParsedData(formattedData);
-            setStatus('File processed successfully');
-            setError('');
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                raw: false,  // This ensures numbers are read as strings
+                defval: ''   // Default value for empty cells
+            });
+    
+            const formattedData = jsonData.map((row) => {
+                // Extract the raw values
+                const num = row.Num?.toString() || '';
+                const category = row.Category?.toString() || '';
+                const name = row.Name?.toString() || '';
+                const price = row.Price?.toString() || '0';
+                const minQuantity = row['Min Quantity']?.toString() || '0';
+                const countryCode = row.CountryCode?.toString() || '977';
+    
+                // Clean and format the phone number
+                let cleanNum = num.replace(/[^\d]/g, '');
+                
+                // Remove country code from number if it's present
+                if (cleanNum.startsWith(countryCode)) {
+                    cleanNum = cleanNum.slice(countryCode.length);
+                } else if (cleanNum.startsWith('0')) {
+                    cleanNum = cleanNum.slice(1);
+                }
+    
+                return {
+                    number: cleanNum,
+                    countryCode: countryCode,
+                    category: category,
+                    name: name,
+                    price: parseFloat(price) || 0,
+                    minQuantity: parseInt(minQuantity, 10) || 0
+                };
+            });
+    
+            // Validate the data
+            const validData = formattedData.filter(item => {
+                const isValidPhone = item.number && /^\d{10}$/.test(item.number); // Expecting 10 digits after country code
+                const isValidPrice = !isNaN(item.price) && item.price > 0;
+                const isValidQuantity = !isNaN(item.minQuantity) && item.minQuantity > 0;
+                
+                return isValidPhone && 
+                       item.category.trim() !== '' && 
+                       item.name.trim() !== '' && 
+                       isValidPrice && 
+                       isValidQuantity;
+            });
+    
+            console.log('Processed valid data:', validData);
+            setParsedData(validData);
+            setCategories([...new Set(validData.map(item => item.category))]);
+            setStatus(`Processed ${validData.length} valid entries`);
         };
-
+    
         reader.readAsArrayBuffer(file);
     };
 
+    
     const handleImageUpload = (files) => {
         console.log('Files received:', files);
         const newImages = Array.from(files).map(file => ({
@@ -116,47 +157,48 @@ const NewProducts = () => {
     }, [API_URL]);
 
     const sendMessages = async () => {
-        if (!parsedData.length) {
+        const filteredData = getFilteredData();
+    
+        if (!filteredData.length) {
             setError('No data to send messages');
             return;
         }
-
+    
         if (!selectedImages.length) {
             setError('Please select at least one product image');
             return;
         }
-
+    
         setIsLoading(true);
         setStatus('Sending messages...');
-
+    
         try {
             const formData = new FormData();
             selectedImages.forEach((image) => {
                 formData.append('images', image.file);
             });
-
+    
             const imageUploadResponse = await axios.post(`${API_URL}/api/upload-images`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                }
+                },
             });
-
+    
+            if (!imageUploadResponse.data.imagePaths) {
+                throw new Error('Image upload failed. Please try again.');
+            }
+    
             const imagePaths = imageUploadResponse.data.imagePaths;
-
             const response = await axios.post(`${API_URL}/api/send-product-messages`, {
-                messages: parsedData,
-                imagePaths: imagePaths
+                messages: filteredData,
+                imagePaths: imagePaths,
+                category: selectedCategory,
             });
-
+    
             if (response.data.success) {
                 setStatus('Messages sent successfully!');
-                toast.success(`Messages sent to: ${parsedData.map(row => row.name).join(', ')}`);
-                
-                setParsedData([]);
-                setSelectedImages([]);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = null;
-                }
+                toast.success(`Messages sent to ${filteredData.length} recipients in ${selectedCategory === 'all' ? 'all categories' : `category: ${selectedCategory}`}`);
+              
             }
         } catch (error) {
             handleError(error);
@@ -164,7 +206,13 @@ const NewProducts = () => {
             setIsLoading(false);
         }
     };
-
+    
+    const getFilteredData = () => {
+        if (selectedCategory === 'all') {
+            return parsedData;
+        }
+        return parsedData.filter(item => item.category === selectedCategory);
+    };
     const handleError = (error) => {
         console.error('Operation failed:', error);
         if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
@@ -181,35 +229,61 @@ const NewProducts = () => {
 
     return (
         <div className="payment-reminder-container">
-            <div className="payment-reminder-content">
-                <div className="payment-reminder-title">
-                    New Products <NewReleases />
-                </div>
+        <div className="payment-reminder-content">
+            <div className="payment-reminder-title">
+                New Products <NewReleases />
+            </div>
 
-                <div className="drop-file">
-                    <FileUpload
-                        ref={fileInputRef}
-                        onFileUpload={handleFileUpload}
-                        acceptedFiles=".xlsx"
-                        storageKey="newProductsFile"
-                    />
-                </div>
+            <div className="drop-file">
+                <FileUpload
+                    ref={fileInputRef}
+                    onFileUpload={handleFileUpload}
+                    acceptedFiles=".xlsx"
+                    storageKey="newProductsFile"
+                />
+            </div>
 
-                <div className="textarea-container">
-                    <textarea
-                        className="custom-textarea"
-                        value={
-                            parsedData.length > 0
-                                ? parsedData
-                                    .map(row => 
-                                        `Name: ${row.name}, Phone: +${row.country_code}${row.number}, Product: ${row.product_name}, Price: NPR ${row.product_price}`
-                                    )
-                                    .join('\n')
-                                : 'No data loaded'
-                        }
-                        readOnly
-                    />
+            {categories.length > 0 && (
+                <div className="category-filter" style={{ margin: '20px 0' }}>
+                    <label htmlFor="category-select" style={{ marginRight: '10px' }}>
+                        Filter by Category:
+                    </label>
+                    <select
+                        id="category-select"
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        style={{
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid #ddd'
+                        }}
+                    >
+                        <option value="all">All Categories</option>
+                        {categories.map((category) => (
+                            <option key={category} value={category}>
+                                {category}
+                            </option>
+                        ))}
+                    </select>
                 </div>
+            )}
+
+            <div className="textarea-container">
+                <textarea
+                    className="custom-textarea"
+                    value={
+                        getFilteredData().length > 0
+                            ? getFilteredData()
+                                .map(row => 
+                                    `Name: ${row.name}, Phone: ${row.number}, Category: ${row.category}, Price: NPR ${row.price.toLocaleString()}, Min Quantity: ${row.minQuantity.toLocaleString()} units`
+                                )
+                                .join('\n')
+                            : 'No data loaded'
+                    }
+                    readOnly
+                />
+            </div>
+       
 
                 <div className="image-upload-container">
                     <ImageUpload
