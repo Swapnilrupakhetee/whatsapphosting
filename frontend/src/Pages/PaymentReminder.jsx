@@ -391,7 +391,6 @@ const PaymentReminder = () => {
     // Helper function to convert Excel serial number to date string
     const excelSerialToDate = (serial) => {
         if (!serial) return '';
-        // Excel's date system starts from 1900-01-01, which is serial number 1
         const date = new Date((serial - 25569) * 86400 * 1000);
         return date.toLocaleDateString('en-GB', {
             day: '2-digit',
@@ -400,9 +399,14 @@ const PaymentReminder = () => {
         });
     };
 
+    // Find the date column header (it will be the only column with an actual date range)
+    const dateColumnKey = Object.keys(jsonData[0]).find(key => 
+        key.includes('to') && key.includes('2024')
+    );
+
     jsonData.forEach((row) => {
         // Check if this is a party name row
-        if (row.__EMPTY_2 && !row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] && 
+        if (row.__EMPTY_2 && !row[dateColumnKey] && 
             !row.__EMPTY_3 && !row.__EMPTY_4) {
             currentParty = row.__EMPTY_2;
             // Reset phone and name for new party
@@ -410,20 +414,20 @@ const PaymentReminder = () => {
             currentName = null;
         }
         // Check if this is a data row
-        else if (row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] && 
-                 typeof row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] === 'number') {
+        else if (row[dateColumnKey] && 
+                typeof row[dateColumnKey] === 'number') {
             // Update current phone and name if present in this row
             if (row.__EMPTY_7) currentPhone = row.__EMPTY_7;
             if (row.__EMPTY_8) currentName = row.__EMPTY_8;
 
             formattedEntries.push({
                 partyName: currentParty,
-                date: excelSerialToDate(row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)']),
+                date: excelSerialToDate(row[dateColumnKey]),
                 miti: row.__EMPTY,
                 refNo: row.__EMPTY_1,
                 pendingAmount: row.__EMPTY_3,
                 finalBalance: row.__EMPTY_4,
-                dueOn: excelSerialToDate(row.__EMPTY_5), // Convert the due date
+                dueOn: excelSerialToDate(row.__EMPTY_5),
                 ageOfBill: row.__EMPTY_6,
                 phone: currentPhone,
                 name: currentName
