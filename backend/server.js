@@ -271,22 +271,27 @@ app.post('/api/send-messages', async (req, res) => {
             messages.map(async (msg) => {
                 const { country_code, number, name, daysLate, outstandingAmount } = msg;
                 const fullNumber = `${country_code}${number}@c.us`;
-                const message = `Dear ${name}, this is a reminder that your payment of NPR ${outstandingAmount} is ${daysLate} days late. Please make the payment as soon as possible.`;
-
-                const randomDelay = Math.floor(Math.random() * (30000 - 12000 + 1)) + 14000;
-
+                
+                // Customize message format for payment reminder
+             // Customize message format for payment reminder
+const message = `Dear ${name},\n\n` +
+`This is a reminder regarding the following pending payments:\n\n` +
+`${msg.detailedContent}\n` +
+`Total Outstanding Amount: NPR ${outstandingAmount}\n\n` +
+`Please arrange the payment as soon as possible to avoid any inconvenience.\n\n` +
+`Thank you for your cooperation.`;
+                // Add random delay between messages (12-30 seconds)
+                const randomDelay = Math.floor(Math.random() * (30000 - 12000 + 1)) + 12000;
                 await new Promise(resolve => setTimeout(resolve, randomDelay));
 
                 try {
                     await client.sendMessage(fullNumber, message);
-
                     return {
                         success: true,
                         number: fullNumber
                     };
                 } catch (error) {
                     console.error(`Failed to send message to ${fullNumber}:`, error);
-
                     return {
                         success: false,
                         number: fullNumber,
@@ -296,6 +301,7 @@ app.post('/api/send-messages', async (req, res) => {
             })
         );
 
+        // Schedule client reset after messages are sent
         setTimeout(async () => {
             console.log("Closing WhatsApp connection after 10 seconds...");
             await resetClient();
@@ -307,14 +313,14 @@ app.post('/api/send-messages', async (req, res) => {
         });
     } catch (error) {
         console.error('Error sending messages:', error);
-        resetClient();
-
+        await resetClient();
         res.status(500).json({
             success: false,
             error: 'Failed to send messages'
         });
     }
 });
+
 
 // Enhanced product message sending endpoint
 app.post('/api/send-product-messages', async (req, res) => {
