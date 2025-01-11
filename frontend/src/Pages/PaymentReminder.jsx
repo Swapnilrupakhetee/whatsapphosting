@@ -385,8 +385,6 @@ const PaymentReminder = () => {
   const formatData = (jsonData) => {
     let formattedEntries = [];
     let currentParty = null;
-    let currentPhone = null;
-    let currentName = null;
 
     // Helper function to convert Excel serial number to date string
     const excelSerialToDate = (serial) => {
@@ -399,98 +397,82 @@ const PaymentReminder = () => {
         });
     };
 
-    // Find the date column header (it will be the only column with an actual date range)
-    const dateColumnKey = Object.keys(jsonData[0]).find(key => 
-        key.includes('to') && key.includes('2024')
+    // Find the date range column (Bills Receivable)
+    const dateRangeKey = Object.keys(jsonData[0]).find(key => 
+        key.toLowerCase().includes('bills receivable')
     );
 
     jsonData.forEach((row) => {
-        // Check if this is a party name row
-        if (row.__EMPTY_2 && !row[dateColumnKey] && 
-            !row.__EMPTY_3 && !row.__EMPTY_4) {
+        // Check if this is a party name row (has __EMPTY_2 with value but no Bills Receivable date)
+        if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
             currentParty = row.__EMPTY_2;
-            // Reset phone and name for new party
-            currentPhone = null;
-            currentName = null;
+            return;
         }
-        // Check if this is a data row
-        else if (row[dateColumnKey] && 
-                typeof row[dateColumnKey] === 'number') {
-            // Update current phone and name if present in this row
-            if (row.__EMPTY_7) currentPhone = row.__EMPTY_7;
-            if (row.__EMPTY_8) currentName = row.__EMPTY_8;
 
-            formattedEntries.push({
+        // Check if this is a data row (has a Bills Receivable date and __EMPTY_3 as Opening Amount)
+        if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
+            const entry = {
                 partyName: currentParty,
-                date: excelSerialToDate(row[dateColumnKey]),
-                miti: row.__EMPTY,
-                refNo: row.__EMPTY_1,
-                pendingAmount: row.__EMPTY_3,
-                finalBalance: row.__EMPTY_4,
-                dueOn: excelSerialToDate(row.__EMPTY_5),
-                ageOfBill: row.__EMPTY_6,
-                phone: currentPhone,
-                name: currentName
-            });
+                date: excelSerialToDate(row[dateRangeKey]),
+                miti: row.__EMPTY || '',
+                refNo: row.__EMPTY_1 || '',
+                pendingAmount: parseFloat(row.__EMPTY_3) || 0,
+                finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
+                dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
+                ageOfBill: row.__EMPTY_6 || ''
+            };
+
+            // Only add entries that have actual data
+            if (entry.date && entry.pendingAmount) {
+                formattedEntries.push(entry);
+            }
         }
     });
 
     return formattedEntries;
 };
 
-const prepareWhatsAppData = (formattedEntries) => {
-  const messages = [];
-  const processedPhones = new Set();
 
-  // Group all entries by their partyName
+const prepareWhatsAppData = (formattedEntries) => {
   const groupedByParty = formattedEntries.reduce((acc, entry) => {
-    if (!acc[entry.partyName]) {
-      acc[entry.partyName] = {
-        entries: [],
-        phone: null,
-        name: null
-      };
-    }
-    // Store contact info
-    if (entry.phone) acc[entry.partyName].phone = entry.phone;
-    if (entry.name) acc[entry.partyName].name = entry.name;
-    acc[entry.partyName].entries.push(entry);
-    return acc;
+      if (!acc[entry.partyName]) {
+          acc[entry.partyName] = {
+              entries: []
+          };
+      }
+      acc[entry.partyName].entries.push(entry);
+      return acc;
   }, {});
 
-  // For each party that has a phone and name
-  Object.entries(groupedByParty).forEach(([partyName, partyData]) => {
-    if (partyData.phone && partyData.name && !processedPhones.has(partyData.phone)) {
-      const cleanPhone = String(partyData.phone).replace(/\D/g, '');
-      const country_code = "977";
-      const number = cleanPhone;
+  const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
+      const totalPending = partyData.entries
+          .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
 
-      // Create detailed message content with all entries
-      const detailedContent = partyData.entries.map(entry => 
-        `Ref No: ${entry.refNo}\n` +
-        `Pending Amount: NPR ${entry.pendingAmount}\n` +
-        `Due Date: ${entry.dueOn}\n` +
-        `Age of Bill: ${entry.ageOfBill} days\n`
+      const formattedEntries = partyData.entries.map(entry => 
+          `Date: ${entry.date}\n` +
+          `Ref No: ${entry.refNo}\n` +
+          `Pending Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+          })}\n` +
+          `Due Date: ${entry.dueOn}\n` +
+          (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
+          '----------------------------------------'
       ).join('\n');
 
-      // Calculate total pending amount for this party
-      const totalPending = partyData.entries
-        .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
-
-      messages.push({
-        country_code,
-        number,
-        name: partyData.name,
-        daysLate: Math.max(...partyData.entries.map(e => parseInt(e.ageOfBill) || 0)),
-        outstandingAmount: totalPending.toFixed(2),
-        detailedContent
-      });
-
-      processedPhones.add(partyData.phone);
-    }
+      return {
+          partyName,
+          daysLate: Math.max(...partyData.entries
+              .map(e => parseInt(e.ageOfBill) || 0)),
+          outstandingAmount: totalPending.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+          }),
+          detailedContent: formattedEntries
+      };
   });
 
-  return messages;
+  return summaries;
 };
 
 const handleFileUpload = (files) => {
@@ -498,72 +480,65 @@ const handleFileUpload = (files) => {
   const reader = new FileReader();
 
   reader.onload = (e) => {
-    try {
-      const data = e.target.result;
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      try {
+          const data = e.target.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+              raw: true,
+              defval: ''
+          });
 
-      console.log('Raw Excel Data:', jsonData);
+          console.log('Raw Excel Data:', jsonData);
 
-      const formattedData = formatData(jsonData);
-      setParsedData(formattedData);
+          const formattedData = formatData(jsonData);
+          setParsedData(formattedData);
 
-      const messages = prepareWhatsAppData(formattedData);
-setWhatsappMessages(messages);
+          const summaries = prepareWhatsAppData(formattedData);
+          setWhatsappMessages(summaries);
 
-      // Group entries by party name and maintain contact info
-      const groupedByParty = formattedData.reduce((acc, entry) => {
-        if (!acc[entry.partyName]) {
-          acc[entry.partyName] = {
-            entries: [],
-            phone: null,
-            name: null
-          };
-        }
-        // Update party's contact info if available
-        if (entry.phone) acc[entry.partyName].phone = entry.phone;
-        if (entry.name) acc[entry.partyName].name = entry.name;
-        acc[entry.partyName].entries.push(entry);
-        return acc;
-      }, {});
+          // Create formatted text for display
+          const text = Object.entries(
+              formattedData.reduce((acc, entry) => {
+                  if (!acc[entry.partyName]) {
+                      acc[entry.partyName] = [];
+                  }
+                  
+                  acc[entry.partyName].push(
+                      `Date: ${entry.date}\n` +
+                      `Miti: ${entry.miti}\n` +
+                      `Ref No: ${entry.refNo}\n` +
+                      `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 2
+                      })}\n` +
+                      `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 2
+                      })}\n` +
+                      `Due on: ${entry.dueOn}\n` +
+                      (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
+                      '----------------------------------------'
+                  );
+                  return acc;
+              }, {})
+          ).map(([partyName, entries]) => 
+              `Party's Name: ${partyName}\n` +
+              '========================================\n\n' +
+              entries.join('\n\n')
+          ).join('\n\n\n');
 
-      // Create formatted text for textarea
-      const text = Object.entries(groupedByParty)
-        .map(([partyName, data]) => {
-          const partyHeader = `Party's Name: ${partyName}\n` +
-                            `Phone: ${data.phone || 'N/A'}\n` +
-                            `Name: ${data.name || 'N/A'}\n` +
-                            '----------------------------------------\n';
+          setFormattedText(text || 'No data loaded');
+          setStatus('File processed successfully');
+          setError('');
           
-          const entriesText = data.entries
-            .map(entry => 
-              `Date: ${entry.date || 'N/A'}\n` +
-              `Miti: ${entry.miti || 'N/A'}\n` +
-              `Ref No: ${entry.refNo || 'N/A'}\n` +
-              `Pending Amount: ${entry.pendingAmount || 'N/A'}\n` +
-              `Final Balance: ${entry.finalBalance || 'N/A'}\n` +
-              `Due on: ${entry.dueOn || 'N/A'}\n` +
-              `Age of Bill in Days: ${entry.ageOfBill || 'N/A'}\n` +
-              '----------------------------------------'
-            )
-            .join('\n\n');
-          
-          return partyHeader + entriesText;
-        })
-        .join('\n\n');
-
-      setFormattedText(text || 'No data loaded');
-      setStatus('File processed successfully');
-      setError('');
-      
-      console.log('Formatted Text:', text);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      setError('Error processing file: ' + error.message);
-      setFormattedText('Error processing file');
-    }
+          console.log('Formatted Text:', text);
+      } catch (error) {
+          console.error('Error processing file:', error);
+          setError('Error processing file: ' + error.message);
+          setFormattedText('Error processing file');
+      }
   };
 
   reader.readAsArrayBuffer(file);

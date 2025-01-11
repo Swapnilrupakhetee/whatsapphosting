@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const { dbQueries } = require('./supabaseClient');
 
 const app = express();
 const port = 5000;
@@ -20,6 +21,7 @@ let isInitializing = false;
 let isClientReady = false;
 let connectionRetries = 0;
 const MAX_RETRIES = 3;
+
 
 // Configure multer for image uploads
 const storage = multer.diskStorage({
