@@ -6,7 +6,6 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
-const { dbQueries } = require('./supabaseClient');
 
 const app = express();
 const port = 5000;
@@ -21,7 +20,6 @@ let isInitializing = false;
 let isClientReady = false;
 let connectionRetries = 0;
 const MAX_RETRIES = 3;
-
 
 // Configure multer for image uploads
 const storage = multer.diskStorage({
@@ -56,7 +54,7 @@ const upload = multer({
     }
 });
 
-// Enhanced initialization with retry mechanism
+// Initialize WhatsApp client
 const initializeWhatsApp = async () => {
     if (isInitializing) {
         throw new Error('WhatsApp client is already initializing');
@@ -70,7 +68,6 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        // Destroy existing client if any
         await resetClient();
 
         client = new Client({
@@ -80,26 +77,15 @@ const initializeWhatsApp = async () => {
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--disable-gpu',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process'
+                    '--no-first-run'
                 ],
-                timeout: 120000, // 2 minute timeout
-                defaultViewport: null
-            },
-            qrMaxRetries: 3,
-            authTimeoutMs: 60000, // 1 minute auth timeout
-            restartOnAuthFail: true
+                timeout: 120000
+            }
         });
 
-        // Enhanced event handlers with connection management
         client.on('qr', async (qr) => {
-            console.log('New QR code received');
             try {
                 qrCodeData = await qrcode.toDataURL(qr);
-                console.log('QR code generated successfully');
             } catch (err) {
                 console.error('QR Generation Error:', err);
                 qrCodeData = null;
@@ -107,46 +93,26 @@ const initializeWhatsApp = async () => {
         });
 
         client.on('ready', () => {
-            console.log('WhatsApp Client is ready!');
             isClientReady = true;
             connectionRetries = 0;
         });
 
-        client.on('auth_failure', async (msg) => {
-            console.error('Authentication failed:', msg);
+        client.on('disconnected', async () => {
             isClientReady = false;
             if (connectionRetries < MAX_RETRIES) {
                 connectionRetries++;
-                console.log(`Retrying connection (${connectionRetries}/${MAX_RETRIES})`);
-                await resetClient();
-                await initializeWhatsApp();
-            } else {
-                console.error('Max retries reached. Please scan QR code again.');
-                await resetClient();
-            }
-        });
-
-        client.on('disconnected', async (reason) => {
-            console.log('Client disconnected:', reason);
-            isClientReady = false;
-            if (connectionRetries < MAX_RETRIES) {
-                connectionRetries++;
-                console.log(`Attempting reconnection (${connectionRetries}/${MAX_RETRIES})`);
                 setTimeout(async () => {
                     await resetClient();
                     await initializeWhatsApp();
-                }, 5000); // Wait 5 seconds before reconnecting
+                }, 5000);
             } else {
-                console.error('Max reconnection attempts reached');
                 await resetClient();
             }
         });
 
         await client.initialize();
-        console.log('Client initialization completed');
         return client;
     } catch (error) {
-        console.error('Failed to initialize client:', error);
         await resetClient();
         throw error;
     } finally {
@@ -154,9 +120,8 @@ const initializeWhatsApp = async () => {
     }
 };
 
-// Enhanced reset function with proper cleanup
+// Reset client
 const resetClient = async () => {
-    console.log('Resetting WhatsApp client...');
     if (client) {
         try {
             await client.destroy();
@@ -167,7 +132,6 @@ const resetClient = async () => {
     client = null;
     qrCodeData = null;
     isClientReady = false;
-    console.log('WhatsApp client reset completed');
 };
 
 // Handle image uploads
@@ -194,12 +158,10 @@ app.post('/api/upload-images', upload.array('images', 5), async (req, res) => {
     }
 });
 
-// Enhanced QR generation endpoint with better error handling
+// Generate QR code endpoint
 app.get('/api/generate-qr', async (req, res) => {
-    console.log('QR code generation request received');
     try {
         if (!client || !isClientReady) {
-            console.log('Initializing new WhatsApp client...');
             await initializeWhatsApp();
         }
 
@@ -210,7 +172,6 @@ app.get('/api/generate-qr', async (req, res) => {
         while (!qrCodeData && attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, waitTime));
             attempts++;
-            console.log(`Waiting for QR code... Attempt ${attempts}/${maxAttempts}`);
         }
 
         if (qrCodeData) {
@@ -223,39 +184,24 @@ app.get('/api/generate-qr', async (req, res) => {
             await resetClient();
             return res.status(408).json({
                 success: false,
-                error: 'QR code generation timeout. Please try again.',
+                error: 'QR code generation timeout'
             });
         }
     } catch (error) {
-        console.error('Error in QR generation:', error);
         await resetClient();
         res.status(500).json({
             success: false,
-            error: error.message || 'Failed to generate QR code',
+            error: error.message
         });
     }
 });
 
-// Enhanced client status endpoint
-app.get('/api/client-status', (req, res) => {
-    res.json({
-        success: true,
-        isReady: isClientReady,
-        connectionAttempts: connectionRetries
-    });
-});
+// Send messages endpoint
 app.post('/api/send-messages', async (req, res) => {
     if (!isClientReady) {
         return res.status(400).json({
             success: false,
-            error: 'WhatsApp client is not ready yet. Please scan the QR code.'
-        });
-    }
-
-    if (!client || !client.info) {
-        return res.status(400).json({
-            success: false,
-            error: 'WhatsApp client not initialized'
+            error: 'WhatsApp client is not ready'
         });
     }
 
@@ -271,50 +217,35 @@ app.post('/api/send-messages', async (req, res) => {
     try {
         const results = await Promise.all(
             messages.map(async (msg) => {
-                const { country_code, number, name, daysLate, outstandingAmount } = msg;
+                const { country_code, number, name, outstandingAmount, detailedContent } = msg;
                 const fullNumber = `${country_code}${number}@c.us`;
                 
-                // Customize message format for payment reminder
-             // Customize message format for payment reminder
-const message = `Dear ${name},\n\n` +
-`This is a reminder regarding the following pending payments:\n\n` +
-`${msg.detailedContent}\n` +
-`Total Outstanding Amount: NPR ${outstandingAmount}\n\n` +
-`Please arrange the payment as soon as possible to avoid any inconvenience.\n\n` +
-`Thank you for your cooperation.`;
-                // Add random delay between messages (12-30 seconds)
+                const message = `Dear ${name},\n\n` +
+                    `This is a reminder regarding the following pending payments:\n\n` +
+                    `${detailedContent}\n` +
+                    `Total Outstanding Amount: NPR ${outstandingAmount}\n\n` +
+                    `Please arrange the payment as soon as possible.\n\n` +
+                    `Thank you for your cooperation.`;
+
                 const randomDelay = Math.floor(Math.random() * (30000 - 12000 + 1)) + 12000;
                 await new Promise(resolve => setTimeout(resolve, randomDelay));
 
                 try {
                     await client.sendMessage(fullNumber, message);
-                    return {
-                        success: true,
-                        number: fullNumber
-                    };
+                    return { success: true, number: fullNumber };
                 } catch (error) {
-                    console.error(`Failed to send message to ${fullNumber}:`, error);
-                    return {
-                        success: false,
-                        number: fullNumber,
-                        error: error.message
-                    };
+                    return { success: false, number: fullNumber, error: error.message };
                 }
             })
         );
 
-        // Schedule client reset after messages are sent
+        // Schedule disconnect after 10 seconds
         setTimeout(async () => {
-            console.log("Closing WhatsApp connection after 10 seconds...");
-            await resetClient();
+            await disconnectAndUnlink();
         }, 10000);
 
-        res.json({
-            success: true,
-            results
-        });
+        res.json({ success: true, results });
     } catch (error) {
-        console.error('Error sending messages:', error);
         await resetClient();
         res.status(500).json({
             success: false,
@@ -323,8 +254,7 @@ const message = `Dear ${name},\n\n` +
     }
 });
 
-
-// Enhanced product message sending endpoint
+// Product message sending endpoint
 app.post('/api/send-product-messages', async (req, res) => {
     if (!isClientReady) {
         return res.status(400).json({ 
@@ -393,7 +323,6 @@ app.post('/api/send-product-messages', async (req, res) => {
                 };
 
             } catch (error) {
-                console.error(`Failed to send message to ${whatsappId}:`, error);
                 return {
                     success: false,
                     error: error.message,
@@ -414,6 +343,11 @@ app.post('/api/send-product-messages', async (req, res) => {
             }
         }
 
+        // Schedule disconnect after 10 seconds
+        setTimeout(async () => {
+            await disconnectAndUnlink();
+        }, 10000);
+
         const successful = results.filter(r => r.success).length;
         const failed = results.filter(r => !r.success).length;
 
@@ -428,7 +362,6 @@ app.post('/api/send-product-messages', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error in send-product-messages:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to send messages',
@@ -437,26 +370,53 @@ app.post('/api/send-product-messages', async (req, res) => {
     }
 });
 
+// Client status endpoint
+app.get('/api/client-status', (req, res) => {
+    res.json({
+        success: true,
+        isReady: isClientReady,
+        connectionAttempts: connectionRetries
+    });
+});
 
-// Enhanced reset endpoint
+// Reset endpoint
 app.get('/api/reset', async (req, res) => {
     try {
         await resetClient();
-        res.json({ 
-            success: true, 
-            message: 'Client reset successfully',
+        res.json({
+            success: true,
             isReady: isClientReady
         });
     } catch (error) {
         res.status(500).json({
             success: false,
-            error: 'Failed to reset client',
-            details: error.message
+            error: error.message
         });
     }
 });
 
-// Start server
+const disconnectAndUnlink = async () => {
+    if (client && isClientReady) {
+        try {
+            // Unlink from WhatsApp Web (removes from linked devices)
+            await client.logout();
+            
+            // Destroy the client
+            await client.destroy();
+            
+            // Reset all states
+            client = null;
+            qrCodeData = null;
+            isClientReady = false;
+            
+            console.log('Successfully disconnected and unlinked WhatsApp client');
+        } catch (error) {
+            console.error('Error during disconnect and unlink:', error);
+            // Attempt force reset if normal disconnect fails
+            await resetClient();
+        }
+    }
+};
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
