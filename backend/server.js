@@ -11,8 +11,9 @@ const app = express();
 const port = 5000;
 
 app.use(cors());
-app.use(bodyParser.json());
-
+app.use(express.json({
+    limit: '2mb' // Reduced limit since we're sending one message at a time
+}));
 // State management
 let client = null;
 let qrCodeData = null;
@@ -199,10 +200,13 @@ app.get('/api/generate-qr', async (req, res) => {
 // Send messages endpoint
 app.post('/api/send-messages', async (req, res) => {
     if (!isClientReady) {
-        return res.status(400).json({
-            success: false,
-            error: 'WhatsApp client is not ready'
-        });
+        await initializeWhatsAppClient();
+        if (!isClientReady) {
+            return res.status(503).json({
+                success: false,
+                error: 'WhatsApp client initialization failed'
+            });
+        }
     }
 
     const { messages } = req.body;
@@ -215,41 +219,47 @@ app.post('/api/send-messages', async (req, res) => {
     }
 
     try {
-        const results = await Promise.all(
-            messages.map(async (msg) => {
-                const { country_code, number, name, outstandingAmount, detailedContent } = msg;
-                const fullNumber = `${country_code}${number}@c.us`;
-                
-                const message = `Dear ${name},\n\n` +
-                    `This is a reminder regarding the following pending payments:\n\n` +
-                    `${detailedContent}\n` +
-                    `Total Outstanding Amount: NPR ${outstandingAmount}\n\n` +
-                    `Please arrange the payment as soon as possible.\n\n` +
-                    `Thank you for your cooperation.`;
+        const results = await Promise.all(messages.map(async (msg) => {
+            const { country_code, number, message } = msg;
+            
+            if (!number || number.length < 10) {
+                return { 
+                    success: false, 
+                    number: `${country_code}${number}`,
+                    error: 'Invalid phone number' 
+                };
+            }
 
-                const randomDelay = Math.floor(Math.random() * (30000 - 12000 + 1)) + 12000;
-                await new Promise(resolve => setTimeout(resolve, randomDelay));
-
-                try {
-                    await client.sendMessage(fullNumber, message);
-                    return { success: true, number: fullNumber };
-                } catch (error) {
-                    return { success: false, number: fullNumber, error: error.message };
+            const fullNumber = `${country_code}${number}@c.us`;
+            
+            try {
+                const isRegistered = await client.isRegisteredUser(fullNumber);
+                if (!isRegistered) {
+                    return { 
+                        success: false, 
+                        number: fullNumber, 
+                        error: 'Number not registered on WhatsApp' 
+                    };
                 }
-            })
-        );
 
-        // Schedule disconnect after 10 seconds
-        setTimeout(async () => {
-            await disconnectAndUnlink();
-        }, 10000);
+                await client.sendMessage(fullNumber, message);
+                return { success: true, number: fullNumber };
+            } catch (error) {
+                return { 
+                    success: false, 
+                    number: fullNumber, 
+                    error: error.message 
+                };
+            }
+        }));
 
         res.json({ success: true, results });
     } catch (error) {
+        console.error('Message sending error:', error);
         await resetClient();
         res.status(500).json({
             success: false,
-            error: 'Failed to send messages'
+            error: 'Failed to send messages: ' + error.message
         });
     }
 });

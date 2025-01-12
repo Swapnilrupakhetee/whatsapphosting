@@ -1,363 +1,3 @@
-// import React, { useState, useCallback, useRef } from 'react';
-// import * as XLSX from 'xlsx';
-// import { NotificationsActive } from '@mui/icons-material';
-// import FileUpload from '../Components/FileUpload';
-// import axios from 'axios';
-// import { toast, ToastContainer } from 'react-toastify';
-// import 'react-toastify/dist/ReactToastify.css'; // Import the CSS for Toastify
-// import '../Styles/PaymentReminder.css';
-
-// const PaymentReminder = () => {
-//   const [parsedData, setParsedData] = useState([]);
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [status, setStatus] = useState('');
-//   const [qrCode, setQrCode] = useState('');
-//   const [error, setError] = useState('');
-//   const [isClientReady, setIsClientReady] = useState(false);
-
-//   const fileInputRef = useRef(null); // Reference for file input
-
-//   const API_URL = 'http://localhost:5000';
-//   const formatData = (jsonData) => {
-//         let formattedEntries = [];
-//         let currentParty = null;
-//         let currentPhone = null;
-//         let currentName = null;
-//         jsonData.forEach((row) => {
-//           // Check if this is a party name row
-//           if (row.__EMPTY_2 && !row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] && 
-//             !row.__EMPTY_3 && !row.__EMPTY_4) {
-//           currentParty = row.__EMPTY_2;
-//           // Reset phone and name for new party
-//           currentPhone = null;
-//           currentName = null;
-//         }
-//         // Check if this is a data row
-//         else if (row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] && 
-//                  typeof row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'] === 'number') {
-//           // Update current phone and name if present in this row
-//           if (row.__EMPTY_7) currentPhone = row.__EMPTY_7;
-//           if (row.__EMPTY_8) currentName = row.__EMPTY_8;
-    
-//           formattedEntries.push({
-//             partyName: currentParty,
-//             date: row['16-Jul-2024 to 22-Dec-2024 (01-04-2081 to 07-09-2081)'],
-//             miti: row.__EMPTY,
-//             refNo: row.__EMPTY_1,
-//             pendingAmount: row.__EMPTY_3,
-//             finalBalance: row.__EMPTY_4,
-//             dueOn: row.__EMPTY_5,
-//             ageOfBill: row.__EMPTY_6,
-//             phone: currentPhone,
-//             name: currentName
-//           });
-//         }
-//       });
-    
-//       return formattedEntries;
-//     };
-
-//   const handleFileUpload = (files) => {
-//   const file = files[0];
-//   const reader = new FileReader();
-
-//   reader.onload = (e) => {
-//     try {
-//       const data = e.target.result;
-//       const workbook = XLSX.read(data, { type: 'array' });
-//       const sheetName = workbook.SheetNames[0];
-//       const worksheet = workbook.Sheets[sheetName];
-//       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-//       console.log('Raw Excel Data:', jsonData);
-
-//       const formattedData = formatData(jsonData);
-//       setParsedData(formattedData);
-
-//       // Group entries by party name and maintain contact info
-//       const groupedByParty = formattedData.reduce((acc, entry) => {
-//         if (!acc[entry.partyName]) {
-//           acc[entry.partyName] = {
-//             entries: [],
-//             phone: null,
-//             name: null
-//           };
-//         }
-//         // Update party's contact info if available
-//         if (entry.phone) acc[entry.partyName].phone = entry.phone;
-//         if (entry.name) acc[entry.partyName].name = entry.name;
-//         acc[entry.partyName].entries.push(entry);
-//         return acc;
-//       }, {});
-
-//       // Create formatted text for textarea
-//       const text = Object.entries(groupedByParty)
-//         .map(([partyName, data]) => {
-//           const partyHeader = `Party's Name: ${partyName}\n` +
-//                             `Phone: ${data.phone || 'N/A'}\n` +
-//                             `Name: ${data.name || 'N/A'}\n` +
-//                             '----------------------------------------\n';
-          
-//           const entriesText = data.entries
-//             .map(entry => 
-//               `Date: ${entry.date || 'N/A'}\n` +
-//               `Miti: ${entry.miti || 'N/A'}\n` +
-//               `Ref No: ${entry.refNo || 'N/A'}\n` +
-//               `Pending Amount: ${entry.pendingAmount || 'N/A'}\n` +
-//               `Final Balance: ${entry.finalBalance || 'N/A'}\n` +
-//               `Due on: ${entry.dueOn || 'N/A'}\n` +
-//               `Age of Bill in Days: ${entry.ageOfBill || 'N/A'}\n` +
-//               '----------------------------------------'
-//             )
-//             .join('\n\n');
-          
-//           return partyHeader + entriesText;
-//         })
-//         .join('\n\n');
-
-//       setFormattedText(text || 'No data loaded');
-//       setStatus('File processed successfully');
-//       setError('');
-      
-//       console.log('Formatted Text:', text);
-//     } catch (error) {
-//       console.error('Error processing file:', error);
-//       setError('Error processing file: ' + error.message);
-//       setFormattedText('Error processing file');
-//     }
-//   };
-
-//   reader.readAsArrayBuffer(file);
-// };
-
-//   const generateQR = useCallback(async () => {
-//     setIsLoading(true);
-//     setError('');
-//     setStatus('Generating QR Code...');
-//     setQrCode('');
-//     setIsClientReady(false);
-
-//     const controller = new AbortController();
-//     const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-//     try {
-//       console.log('Starting QR code request...');
-//       const response = await axios.get(`${API_URL}/api/generate-qr`, {
-//         signal: controller.signal,
-//         headers: {
-//           'Cache-Control': 'no-cache',
-//           'Pragma': 'no-cache',
-//         },
-//       });
-
-//       if (response.data.success && response.data.qrCode) {
-//         setQrCode(response.data.qrCode);
-//         setStatus('Scan the QR code with WhatsApp to connect');
-
-//         // Start polling for client ready status
-//         startPollingClientStatus();
-//       } else {
-//         throw new Error('Invalid response format from server');
-//       }
-//     } catch (error) {
-//       handleError(error);
-//     } finally {
-//       clearTimeout(timeoutId);
-//       setIsLoading(false);
-//     }
-//   }, [API_URL]);
-
-//   const startPollingClientStatus = useCallback(async () => {
-//     const pollInterval = setInterval(async () => {
-//       try {
-//         const response = await axios.get(`${API_URL}/api/client-status`);
-//         if (response.data.isReady) {
-//           setIsClientReady(true);
-//           setStatus('WhatsApp connected! Ready to send messages.');
-//           clearInterval(pollInterval);
-//         }
-//       } catch (error) {
-//         console.error('Error checking client status:', error);
-//       }
-//     }, 2000); // Poll every 2 seconds
-
-//     // Clear interval after 2 minutes to prevent indefinite polling
-//     setTimeout(() => clearInterval(pollInterval), 120000);
-//   }, [API_URL]);
-
-//   const sendMessages = async () => {
-//     if (!parsedData.length) {
-//       setError('No data to send messages');
-//       return;
-//     }
-
-//     setIsLoading(true);
-//     setStatus('Sending messages...');
-
-//     try {
-//       const response = await axios.post(`${API_URL}/api/send-messages`, {
-//         messages: parsedData,
-//       });
-
-//       if (response.data.success) {
-//         setStatus('Messages sent successfully!');
-//         const results = response.data.results;
-//         const failedMessages = results.filter((r) => !r.success);
-
-//         // Toast for each sent message
-//         const sentTo = parsedData.map((row) => row.name).join(', ');
-//         toast.success(`Messages sent to: ${sentTo}`);
-
-//         if (failedMessages.length > 0) {
-//           setError(`${failedMessages.length} messages failed to send.`);
-//         }
-
-//         // Clear data and reset file input
-//         setParsedData([]);
-//         setQrCode('');
-//         fileInputRef.current.value = null; // Reset file input field
-//       }
-//     } catch (error) {
-//       handleError(error);
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   const handleError = (error) => {
-//     console.error('Operation failed:', error);
-//     if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
-//       setError('Request timed out. Please try again.');
-//     } else if (error.response) {
-//       setError(`Server error: ${error.response.data.error || 'Unknown error'}`);
-//     } else if (error.request) {
-//       setError('No response from server. Please check your connection.');
-//     } else {
-//       setError(`Error: ${error.message}`);
-//     }
-//     setStatus('');
-//   };
-
-//   return (
-//     <div className="payment-reminder-container">
-//       <div className="payment-reminder-content">
-//         <div className="payment-reminder-title">
-//           Payment Reminder <NotificationsActive />
-//         </div>
-
-//         <div className="drop-file">
-//           <FileUpload
-//             ref={fileInputRef} // Set ref to file upload component
-//             className="file-icon"
-//             onFileUpload={handleFileUpload}
-//             acceptedFiles=".xlsx"
-//             storageKey="paymentReminderFile"
-//           />
-//         </div>
-
-        
-
-//         {status && (
-//           <div className="status-message" style={{ color: '#666', margin: '10px 0' }}>
-//             {status}
-//           </div>
-//         )}
-
-//         {qrCode && !isClientReady && (
-//           <div
-//             className="qr-code-container"
-//             style={{
-//               textAlign: 'center',
-//               margin: '20px 0',
-//               padding: '20px',
-//               border: '1px solid #ddd',
-//               borderRadius: '8px',
-//             }}
-//           >
-//             <img
-//               src={qrCode}
-//               alt="WhatsApp QR Code"
-//               style={{
-//                 maxWidth: '250px',
-//                 width: '100%',
-//                 height: 'auto',
-//               }}
-//             />
-//           </div>
-//         )}
-
-//         <div className="textarea-container">
-//           <textarea
-//             className="custom-textarea"
-//             value={
-//               parsedData.length > 0
-//                 ? parsedData
-//                     .map(
-//                       (row) =>
-//                         `Name: ${row.name}, Phone: +${row.country_code}${row.number}, Days Late: ${row.daysLate}, Amount: NPR ${row.outstandingAmount}`
-//                     )
-//                     .join('\n')
-//                 : 'No data loaded'
-//             }
-//             readOnly
-//           />
-//         </div>
-
-//         <div className="button-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-//           {!isClientReady && (
-//             <button
-//               className="generate-qr-button"
-//               onClick={generateQR}
-//               disabled={isLoading}
-//               style={{
-//                 opacity: isLoading ? 0.7 : 1,
-//                 cursor: isLoading ? 'not-allowed' : 'pointer',
-//                 backgroundColor: '#25D366',
-//                 color: 'white',
-//                 padding: '12px 24px',
-//                 border: 'none',
-//                 borderRadius: '6px',
-//                 fontSize: '16px',
-//                 fontWeight: 'bold',
-//                 marginTop: '20px',
-//               }}
-//             >
-//               {isLoading ? 'Generating QR...' : 'Generate QR Code'}
-//             </button>
-//           )}
-
-//           {isClientReady && parsedData.length > 0 && (
-//             <button
-//               className="send-messages-button"
-//               onClick={sendMessages}
-//               disabled={isLoading}
-//               style={{
-//                 opacity: isLoading ? 0.7 : 1,
-//                 cursor: isLoading ? 'not-allowed' : 'pointer',
-//                 backgroundColor: '#25D366',
-//                 color: 'white',
-//                 padding: '12px 24px',
-//                 border: 'none',
-//                 borderRadius: '6px',
-//                 fontSize: '16px',
-//                 fontWeight: 'bold',
-//                 marginTop: '20px',
-//               }}
-//             >
-//               {isLoading ? 'Sending Messages...' : 'Send Messages'}
-//             </button>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* ToastContainer for React Toastify */}
-//       <ToastContainer />
-//     </div>
-//   );
-// };
-// export default PaymentReminder;
-
-
 
 import React, { useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
@@ -367,6 +7,7 @@ import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../Styles/PaymentReminder.css';
+import phoneNumberData from '../PaymentReminder.json';
 
 const PaymentReminder = () => {
   const [parsedData, setParsedData] = useState([]);
@@ -381,6 +22,91 @@ const PaymentReminder = () => {
 
   const fileInputRef = useRef(null);
   const API_URL = 'http://localhost:5000';
+  const CHUNK_SIZE = 10;
+
+  const consolidateMessages = (whatsappMessages) => {
+    // Group messages by phone number (manager)
+    const groupedByManager = whatsappMessages.reduce((acc, message) => {
+      const phoneNumber = message.phoneNumber;
+      if (!phoneNumber) return acc;
+      
+      if (!acc[phoneNumber]) {
+        acc[phoneNumber] = {
+          parties: [],
+          totalAmount: 0
+        };
+      }
+      
+      acc[phoneNumber].parties.push({
+        partyName: message.partyName,
+        outstandingAmount: parseFloat(message.outstandingAmount.replace(/,/g, '')),
+        details: message.detailedContent
+      });
+      
+      acc[phoneNumber].totalAmount += parseFloat(message.outstandingAmount.replace(/,/g, ''));
+      
+      return acc;
+    }, {});
+
+    // Format consolidated messages
+    return Object.entries(groupedByManager).map(([phoneNumber, data]) => {
+      const message = `Dear Manager,
+
+This is a consolidated report of pending payments for all parties under your supervision:
+
+${data.parties.map(party => `
+== ${party.partyName} ==
+Outstanding Amount: NPR ${party.outstandingAmount.toLocaleString('en-IN', {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2
+})}
+
+Detailed Transactions:
+${party.details}
+`).join('\n')}
+
+Total Outstanding Amount for All Parties: NPR ${data.totalAmount.toLocaleString('en-IN', {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2
+})}
+
+Please follow up with the respective parties for payment collection.
+
+Thank you for your cooperation.`;
+
+      return {
+        country_code: '977', // Assuming Nepal's country code
+        number: phoneNumber.replace(/\D/g, ''), // Remove non-numeric characters
+        message
+      };
+    });
+  };
+  const sendBatchMessages = async (messages) => {
+    try {
+      setStatus('Sending consolidated messages...');
+      const consolidated = consolidateMessages(messages);
+      
+      const response = await fetch('http://localhost:5000/api/send-messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: consolidated }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setStatus('Messages sent successfully');
+      } else {
+        throw new Error(result.error || 'Failed to send messages');
+      }
+    } catch (err) {
+      setError(err.message);
+      setStatus('Failed to send messages');
+    }
+  };
+
 
   const formatData = (jsonData) => {
     let formattedEntries = [];
@@ -397,6 +123,14 @@ const PaymentReminder = () => {
         });
     };
 
+    const getPhoneNumber = (partyName) => {
+      const contact = phoneNumberData.find(entry => 
+        entry["Name of Ledger"].toLowerCase() === partyName.toLowerCase()
+      );
+      return contact ? contact.phone_number : null;
+    };
+
+
     // Find the date range column (Bills Receivable)
     const dateRangeKey = Object.keys(jsonData[0]).find(key => 
         key.toLowerCase().includes('bills receivable')
@@ -411,17 +145,19 @@ const PaymentReminder = () => {
 
         // Check if this is a data row (has a Bills Receivable date and __EMPTY_3 as Opening Amount)
         if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
-            const entry = {
-                partyName: currentParty,
-                date: excelSerialToDate(row[dateRangeKey]),
-                miti: row.__EMPTY || '',
-                refNo: row.__EMPTY_1 || '',
-                pendingAmount: parseFloat(row.__EMPTY_3) || 0,
-                finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
-                dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
-                ageOfBill: row.__EMPTY_6 || ''
-            };
-
+          const phoneNumber = getPhoneNumber(currentParty);
+          
+          const entry = {
+            partyName: currentParty,
+            phoneNumber: phoneNumber, // Add phone number here
+            date: excelSerialToDate(row[dateRangeKey]),
+            miti: row.__EMPTY || '',
+            refNo: row.__EMPTY_1 || '',
+            pendingAmount: parseFloat(row.__EMPTY_3) || 0,
+            finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
+            dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
+            ageOfBill: row.__EMPTY_6 || ''
+          };
             // Only add entries that have actual data
             if (entry.date && entry.pendingAmount) {
                 formattedEntries.push(entry);
@@ -435,114 +171,117 @@ const PaymentReminder = () => {
 
 const prepareWhatsAppData = (formattedEntries) => {
   const groupedByParty = formattedEntries.reduce((acc, entry) => {
-      if (!acc[entry.partyName]) {
-          acc[entry.partyName] = {
-              entries: []
-          };
-      }
-      acc[entry.partyName].entries.push(entry);
-      return acc;
+    if (!acc[entry.partyName]) {
+      acc[entry.partyName] = {
+        entries: [],
+        phoneNumber: entry.phoneNumber // Store phone number from entry
+      };
+    }
+    acc[entry.partyName].entries.push(entry);
+    return acc;
   }, {});
 
   const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
-      const totalPending = partyData.entries
-          .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
+    const totalPending = partyData.entries
+      .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
 
-      const formattedEntries = partyData.entries.map(entry => 
-          `Date: ${entry.date}\n` +
-          `Ref No: ${entry.refNo}\n` +
-          `Pending Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
-              maximumFractionDigits: 2,
-              minimumFractionDigits: 2
-          })}\n` +
-          `Due Date: ${entry.dueOn}\n` +
-          (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
-          '----------------------------------------'
-      ).join('\n');
+    const detailedContent = partyData.entries.map(entry => 
+      `Bill Date: ${entry.date}\n` +
+      `Reference: ${entry.refNo}\n` +
+      `Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2
+      })}\n` +
+      `Due Date: ${entry.dueOn}\n` +
+      (entry.ageOfBill ? `Days Overdue: ${entry.ageOfBill}\n` : '') +
+      '----------------------------------------'
+    ).join('\n');
 
-      return {
-          partyName,
-          daysLate: Math.max(...partyData.entries
-              .map(e => parseInt(e.ageOfBill) || 0)),
-          outstandingAmount: totalPending.toLocaleString('en-IN', {
-              maximumFractionDigits: 2,
-              minimumFractionDigits: 2
-          }),
-          detailedContent: formattedEntries
-      };
+    return {
+      partyName,
+      phoneNumber: partyData.phoneNumber,
+      outstandingAmount: totalPending.toLocaleString('en-IN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2
+      }),
+      detailedContent
+    };
   });
 
   return summaries;
 };
+
 
 const handleFileUpload = (files) => {
   const file = files[0];
   const reader = new FileReader();
 
   reader.onload = (e) => {
-      try {
-          const data = e.target.result;
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-              raw: true,
-              defval: ''
-          });
+    try {
+      const data = e.target.result;
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        raw: true,
+        defval: ''
+      });
 
-          console.log('Raw Excel Data:', jsonData);
+      console.log('Raw Excel Data:', jsonData);
 
-          const formattedData = formatData(jsonData);
-          setParsedData(formattedData);
+      const formattedData = formatData(jsonData);
+      setParsedData(formattedData);
 
-          const summaries = prepareWhatsAppData(formattedData);
-          setWhatsappMessages(summaries);
+      const summaries = prepareWhatsAppData(formattedData);
+      setWhatsappMessages(summaries);
 
-          // Create formatted text for display
-          const text = Object.entries(
-              formattedData.reduce((acc, entry) => {
-                  if (!acc[entry.partyName]) {
-                      acc[entry.partyName] = [];
-                  }
-                  
-                  acc[entry.partyName].push(
-                      `Date: ${entry.date}\n` +
-                      `Miti: ${entry.miti}\n` +
-                      `Ref No: ${entry.refNo}\n` +
-                      `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
-                          maximumFractionDigits: 2,
-                          minimumFractionDigits: 2
-                      })}\n` +
-                      `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
-                          maximumFractionDigits: 2,
-                          minimumFractionDigits: 2
-                      })}\n` +
-                      `Due on: ${entry.dueOn}\n` +
-                      (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
-                      '----------------------------------------'
-                  );
-                  return acc;
-              }, {})
-          ).map(([partyName, entries]) => 
-              `Party's Name: ${partyName}\n` +
-              '========================================\n\n' +
-              entries.join('\n\n')
-          ).join('\n\n\n');
-
-          setFormattedText(text || 'No data loaded');
-          setStatus('File processed successfully');
-          setError('');
+      // Create formatted text for display
+      const text = Object.entries(
+        formattedData.reduce((acc, entry) => {
+          if (!acc[entry.partyName]) {
+            acc[entry.partyName] = [];
+          }
           
-          console.log('Formatted Text:', text);
-      } catch (error) {
-          console.error('Error processing file:', error);
-          setError('Error processing file: ' + error.message);
-          setFormattedText('Error processing file');
-      }
+          acc[entry.partyName].push(
+            `Date: ${entry.date}\n` +
+            `Miti: ${entry.miti}\n` +
+            `Ref No: ${entry.refNo}\n` +
+            `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+            })}\n` +
+            `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+            })}\n` +
+            `Due on: ${entry.dueOn}\n` +
+            (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
+            '----------------------------------------'
+          );
+          return acc;
+        }, {})
+      ).map(([partyName, entries]) => 
+        `Party's Name: ${partyName}\n` +
+        'Phone Number: ' + (formattedData.find(d => d.partyName === partyName).phoneNumber || 'Not found') + '\n' +
+        '========================================\n\n' +
+        entries.join('\n\n')
+      ).join('\n\n\n');
+
+      setFormattedText(text || 'No data loaded');
+      setStatus('File processed successfully');
+      setError('');
+      
+      console.log('Formatted Text:', text);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      setError('Error processing file: ' + error.message);
+      setFormattedText('Error processing file');
+    }
   };
 
   reader.readAsArrayBuffer(file);
 };
+
 
 const generateQR = useCallback(async () => {
       setIsLoading(true);
@@ -605,57 +344,98 @@ const generateQR = useCallback(async () => {
         return;
       }
     
-      setIsLoading(true);
-      setStatus('Sending messages...');
-    
       try {
-        const response = await axios.post(`${API_URL}/api/send-messages`, {
-          messages: whatsappMessages,
-        });
+        setStatus('Preparing messages...');
+        setIsLoading(true);
+        
+        // Use the consolidateMessages function to group messages by manager
+        const consolidated = consolidateMessages(whatsappMessages);
+        
+        if (!consolidated.length) {
+          setError('No messages with valid phone numbers to send');
+          return;
+        }
     
-        if (response.data.success) {
-          setStatus('Messages sent successfully!');
-          const results = response.data.results;
-          const failedMessages = results.filter((r) => !r.success);
+        // Process one message at a time
+        let successCount = 0;
+        let failureCount = 0;
+        const failedNumbers = [];
     
-          const sentTo = whatsappMessages.map((msg) => msg.name).join(', ');
-          toast.success(`Messages sent to: ${sentTo}`);
+        for (let i = 0; i < consolidated.length; i++) {
+          const message = consolidated[i];
+          setStatus(`Sending message ${i + 1} of ${consolidated.length}...`);
     
-          if (failedMessages.length > 0) {
-            setError(`${failedMessages.length} messages failed to send.`);
+          try {
+            const response = await axios.post(`${API_URL}/api/send-messages`, {
+              messages: [message] // Send just one message at a time
+            });
+    
+            if (response.data.success) {
+              successCount++;
+            } else {
+              failureCount++;
+              failedNumbers.push(message.number);
+            }
+    
+            // Add small delay between messages
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error) {
+            console.error(`Error sending message ${i + 1}:`, error);
+            failureCount++;
+            failedNumbers.push(message.number);
           }
+        }
     
-          // Reset states
+        if (successCount > 0) {
+          toast.success(`Successfully sent ${successCount} messages`);
+        }
+    
+        if (failureCount > 0) {
+          toast.error(`Failed to send ${failureCount} messages. Failed numbers: ${failedNumbers.join(', ')}`);
+        }
+    
+        // Reset states only if all messages were sent successfully
+        if (failureCount === 0) {
           setParsedData([]);
           setWhatsappMessages([]);
           setQrCode('');
           setFormattedText('No data loaded');
           
-          // Safely reset file input if it exists
           if (fileInputRef.current) {
             fileInputRef.current.value = null;
           }
         }
+    
+        setStatus(`Completed: ${successCount} sent, ${failureCount} failed`);
       } catch (error) {
-        handleError(error);
+        console.error('Send messages error:', error);
+        const errorMessage = error.response?.data?.error || error.message;
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
     };
+    
   
   
     const handleError = (error) => {
       console.error('Operation failed:', error);
+      const errorMessage = error.response?.data?.error 
+        || error.message 
+        || 'Unknown error occurred';
+      
       if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
         setError('Request timed out. Please try again.');
       } else if (error.response) {
-        setError(`Server error: ${error.response.data.error || 'Unknown error'}`);
+        setError(`Server error: ${errorMessage}`);
       } else if (error.request) {
         setError('No response from server. Please check your connection.');
       } else {
-        setError(`Error: ${error.message}`);
+        setError(`Error: ${errorMessage}`);
       }
       setStatus('');
+      toast.error(errorMessage);
     };
 
   return (
