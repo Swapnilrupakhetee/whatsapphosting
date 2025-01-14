@@ -5,6 +5,7 @@
     width: 100%;
     background-color: rgb(244, 244, 244);
    padding: 0px 10px;
+   padding-bottom: 2rem;
 }
 .payment-reminder-content{
     display: flex;
@@ -77,3 +78,28 @@
     }
     
 }
+.loading-text-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #666;
+  }
+  
+  .loading-dot-animation {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #25D366;
+    animation: loadingDots 1.4s infinite ease-in-out;
+  }
+  
+  @keyframes loadingDots {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }

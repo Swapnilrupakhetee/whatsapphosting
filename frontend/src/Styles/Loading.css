@@ -1,0 +1,50 @@
+/* Loading.css */
+.loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+  
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #25D366; /* WhatsApp green color */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  .spinner-sm {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+  }
+  
+  .spinner-lg {
+    width: 56px;
+    height: 56px;
+    border-width: 5px;
+  }
+  
+  .spinner-white {
+    border-color: rgba(255, 255, 255, 0.2);
+    border-top-color: white;
+  }
+  
+  .loading-text {
+    font-size: 14px;
+    color: #666;
+    margin-top: 8px;
+    text-align: center;
+  }
+  
+  .loading-text-white {
+    color: white;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }

@@ -10,6 +10,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../Styles/PaymentReminder.css';
 import phoneNumberData from '../PaymentReminder.json';
+import LoadingSpinner from '../Components/LoadingSpinner';
 
 
 const PaymentReminder = () => {
@@ -23,6 +24,7 @@ const PaymentReminder = () => {
   const [whatsappMessages, setWhatsappMessages] = useState([]);
   const [phoneNumberData, setPhoneNumberData] = useState([]);
   const [missingEntries, setMissingEntries] = useState([]);
+  const [isPhoneNumberProcessing, setIsPhoneNumberProcessing] = useState(false);
 
 
   const fileInputRef = useRef(null);
@@ -137,10 +139,12 @@ Thank you for your cooperation.`;
 
 
   const formatData = (jsonData) => {
+    setIsPhoneNumberProcessing(true); // Start loading
     let formattedEntries = [];
     let currentParty = null;
     let missingParties = new Set();
 
+    try{
     // Helper function to convert Excel serial number to date string
     const excelSerialToDate = (serial) => {
         if (!serial) return '';
@@ -153,20 +157,20 @@ Thank you for your cooperation.`;
     };
     const getPhoneNumber = (partyName) => {
       if (!Array.isArray(phoneNumberData) || !partyName) {
-        console.log('Invalid input:', { phoneNumberData, partyName });
+       
         return null;
       }
     
       const normalizedPartyName = partyName.trim().toLowerCase();
-      console.log('Looking for party:', normalizedPartyName);
+      
       
       const contact = phoneNumberData.find(entry => {
         const entryName = entry["Name of Ledger"]?.trim().toLowerCase();
-        console.log('Comparing with:', entryName);
+        
         return entryName === normalizedPartyName;
       });
     
-      console.log('Found contact:', contact);
+      
       return contact ? contact.phone_number : null;
     };
   
@@ -209,7 +213,10 @@ Thank you for your cooperation.`;
         }
     });
     setMissingEntries(Array.from(missingParties));
-
+  }
+  finally{
+    setIsPhoneNumberProcessing(false);
+  }
     return formattedEntries;
 };
 
@@ -561,8 +568,39 @@ const generateQR = useCallback(async () => {
           />
         </div>
       )}
+      {isPhoneNumberProcessing && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+          }}>
+            <LoadingSpinner 
+              size="lg"
+              text="Processing phone numbers..." 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="textarea-container">
+      {isLoading && parsedData.length === 0 ? (
+        <div className="loading-container">
+          <LoadingSpinner size="lg" text="Processing file..." />
+        </div>
+      ) : (
         <textarea
           className="custom-textarea"
           value={formattedText}
@@ -578,8 +616,13 @@ const generateQR = useCallback(async () => {
             border: '1px solid #ddd'
           }}
         />
+      )}
       </div>
-
+      {isLoading && phoneNumberData.length === 0 && (
+        <div className="loading-container">
+          <LoadingSpinner text="Loading phone numbers..." />
+        </div>
+      )}
       <div className="button-container">
         {!isClientReady && whatsappMessages.length > 0 && (
           <button
