@@ -3,7 +3,7 @@ import { Sidebar, Menu, MenuItem } from "react-pro-sidebar";
 import { FaBars } from "react-icons/fa";
 import { NotificationsActive, NewReleases } from "@mui/icons-material";
 import { Link, useLocation } from "react-router-dom";
-
+import { FaUserFriends } from "react-icons/fa";
 import "../Styles/Sidebar.css";
 
 const SidebarAdmin = () => {
@@ -52,6 +52,23 @@ const SidebarAdmin = () => {
                     className="sidebar-icon"
                     style={{
                       color: isActive("/new-product") ? "#4caf50" : "inherit",
+                    }}
+                  />
+                  <span className="menu-text">
+                    {!collapsed && "New Products"}
+                  </span>
+                </div>
+              </MenuItem>
+            </Link>
+            <Link to="/member" className="links">
+              <MenuItem
+                className={`menu-item ${isActive("/member") ? "active" : ""}`}
+              >
+                <div className="sidebar-items">
+                <FaUserFriends
+                    className="sidebar-icon"
+                    style={{
+                      color: isActive("/member") ? "#4caf50" : "inherit",
                     }}
                   />
                   <span className="menu-text">

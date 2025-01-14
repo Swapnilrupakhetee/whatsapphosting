@@ -6,14 +6,28 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
-
+const connectDB = require('./config/db');
 const app = express();
 const port = 5000;
+const dotenv = require('dotenv');
+const infoRoutes= require('./router/infoRouter');
+
+
+
+dotenv.config();
 
 app.use(cors());
+
+
+
+
 app.use(express.json({
     limit: '2mb' // Reduced limit since we're sending one message at a time
 }));
+app.use(express.urlencoded({ extended: true })); 
+
+
+app.use('/api/info', infoRoutes);
 // State management
 let client = null;
 let qrCodeData = null;
@@ -37,6 +51,8 @@ const storage = multer.diskStorage({
         cb(null, `${Date.now()}-${file.originalname}`);
     }
 });
+
+connectDB();
 
 const upload = multer({
     storage: storage,

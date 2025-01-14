@@ -1,13 +1,16 @@
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef,useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { NotificationsActive } from '@mui/icons-material';
+import { Warning } from '@mui/icons-material';
+
 import FileUpload from '../Components/FileUpload';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../Styles/PaymentReminder.css';
 import phoneNumberData from '../PaymentReminder.json';
+
 
 const PaymentReminder = () => {
   const [parsedData, setParsedData] = useState([]);
@@ -18,11 +21,36 @@ const PaymentReminder = () => {
   const [error, setError] = useState('');
   const [isClientReady, setIsClientReady] = useState(false);
   const [whatsappMessages, setWhatsappMessages] = useState([]);
+  const [phoneNumberData, setPhoneNumberData] = useState([]);
+  const [missingEntries, setMissingEntries] = useState([]);
 
 
   const fileInputRef = useRef(null);
   const API_URL = 'http://localhost:5000';
   const CHUNK_SIZE = 10;
+
+
+  useEffect(() => {
+    const fetchPhoneNumbers = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get(`${API_URL}/api/info`);
+        // Store just the array, not the whole response object
+        setPhoneNumberData(response.data.data || []); 
+        setStatus('Phone numbers loaded successfully');
+      } catch (err) {
+        console.error('Error fetching phone numbers:', err);
+        setError(`Failed to fetch phone numbers: ${err.message}`);
+        toast.error('Failed to fetch phone numbers from database');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchPhoneNumbers();
+  }, []);
+  
+
 
   const consolidateMessages = (whatsappMessages) => {
     // Group messages by phone number (manager)
@@ -75,8 +103,8 @@ Please follow up with the respective parties for payment collection.
 Thank you for your cooperation.`;
 
       return {
-        country_code: '977', // Assuming Nepal's country code
-        number: phoneNumber.replace(/\D/g, ''), // Remove non-numeric characters
+        country_code: '977',
+        number: phoneNumber.replace(/\D/g, ''),
         message
       };
     });
@@ -111,6 +139,7 @@ Thank you for your cooperation.`;
   const formatData = (jsonData) => {
     let formattedEntries = [];
     let currentParty = null;
+    let missingParties = new Set();
 
     // Helper function to convert Excel serial number to date string
     const excelSerialToDate = (serial) => {
@@ -122,13 +151,26 @@ Thank you for your cooperation.`;
             year: 'numeric'
         });
     };
-
     const getPhoneNumber = (partyName) => {
-      const contact = phoneNumberData.find(entry => 
-        entry["Name of Ledger"].toLowerCase() === partyName.toLowerCase()
-      );
+      if (!Array.isArray(phoneNumberData) || !partyName) {
+        console.log('Invalid input:', { phoneNumberData, partyName });
+        return null;
+      }
+    
+      const normalizedPartyName = partyName.trim().toLowerCase();
+      console.log('Looking for party:', normalizedPartyName);
+      
+      const contact = phoneNumberData.find(entry => {
+        const entryName = entry["Name of Ledger"]?.trim().toLowerCase();
+        console.log('Comparing with:', entryName);
+        return entryName === normalizedPartyName;
+      });
+    
+      console.log('Found contact:', contact);
       return contact ? contact.phone_number : null;
     };
+  
+ 
 
 
     // Find the date range column (Bills Receivable)
@@ -137,15 +179,17 @@ Thank you for your cooperation.`;
     );
 
     jsonData.forEach((row) => {
-        // Check if this is a party name row (has __EMPTY_2 with value but no Bills Receivable date)
-        if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
-            currentParty = row.__EMPTY_2;
-            return;
-        }
+      if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
+          currentParty = row.__EMPTY_2;
+          return;
+      }
 
-        // Check if this is a data row (has a Bills Receivable date and __EMPTY_3 as Opening Amount)
-        if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
+      if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
           const phoneNumber = getPhoneNumber(currentParty);
+          
+          if (!phoneNumber) {
+              missingParties.add(currentParty);
+          }
           
           const entry = {
             partyName: currentParty,
@@ -164,6 +208,7 @@ Thank you for your cooperation.`;
             }
         }
     });
+    setMissingEntries(Array.from(missingParties));
 
     return formattedEntries;
 };
@@ -235,43 +280,52 @@ const handleFileUpload = (files) => {
       const summaries = prepareWhatsAppData(formattedData);
       setWhatsappMessages(summaries);
 
+      // Group the data by party and include phone numbers
+      const groupedData = formattedData.reduce((acc, entry) => {
+        if (!acc[entry.partyName]) {
+          acc[entry.partyName] = {
+            entries: [],
+            phoneNumber: entry.phoneNumber // Store the phone number at the party level
+          };
+        }
+        acc[entry.partyName].entries.push(entry);
+        return acc;
+      }, {});
+
       // Create formatted text for display
-      const text = Object.entries(
-        formattedData.reduce((acc, entry) => {
-          if (!acc[entry.partyName]) {
-            acc[entry.partyName] = [];
-          }
-          
-          acc[entry.partyName].push(
-            `Date: ${entry.date}\n` +
-            `Miti: ${entry.miti}\n` +
-            `Ref No: ${entry.refNo}\n` +
-            `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
-              maximumFractionDigits: 2,
-              minimumFractionDigits: 2
-            })}\n` +
-            `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
-              maximumFractionDigits: 2,
-              minimumFractionDigits: 2
-            })}\n` +
-            `Due on: ${entry.dueOn}\n` +
-            (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
-            '----------------------------------------'
-          );
-          return acc;
-        }, {})
-      ).map(([partyName, entries]) => 
-        `Party's Name: ${partyName}\n` +
-        'Phone Number: ' + (formattedData.find(d => d.partyName === partyName).phoneNumber || 'Not found') + '\n' +
-        '========================================\n\n' +
-        entries.join('\n\n')
-      ).join('\n\n\n');
+      const text = Object.entries(groupedData).map(([partyName, partyData]) => {
+        const entriesText = partyData.entries.map(entry =>
+          `Date: ${entry.date}\n` +
+          `Miti: ${entry.miti}\n` +
+          `Ref No: ${entry.refNo}\n` +
+          `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 2
+          })}\n` +
+          `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 2
+          })}\n` +
+          `Due on: ${entry.dueOn}\n` +
+          (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
+          '----------------------------------------'
+        ).join('\n\n');
+
+        return (
+          `Party's Name: ${partyName}\n` +
+          `Phone Number: ${partyData.phoneNumber || 'Not found'}\n` +
+          '========================================\n\n' +
+          entriesText
+        );
+      }).join('\n\n\n');
 
       setFormattedText(text || 'No data loaded');
       setStatus('File processed successfully');
       setError('');
       
       console.log('Formatted Text:', text);
+      // Also log the phone number data for debugging
+      console.log('Phone Number Data:', phoneNumberData);
     } catch (error) {
       console.error('Error processing file:', error);
       setError('Error processing file: ' + error.message);
@@ -464,6 +518,27 @@ const generateQR = useCallback(async () => {
       {error && (
         <div className="error-message" style={{ color: 'red', margin: '10px 0' }}>
           {error}
+        </div>
+      )}
+      {missingEntries.length > 0 && (
+        <div className="missing-entries-container" style={{
+          margin: '20px 0',
+          padding: '15px',
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffeeba',
+          borderRadius: '4px',
+          color: '#856404'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+            <Warning style={{ marginRight: '8px', color: '#856404' }} />
+            <h4 style={{ margin: 0 }}>Missing Phone Numbers</h4>
+          </div>
+          <p style={{ margin: '0 0 10px 0' }}>The following parties do not have associated phone numbers in the database:</p>
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            {missingEntries.map((party, index) => (
+              <li key={index}>{party}</li>
+            ))}
+          </ul>
         </div>
       )}
 
