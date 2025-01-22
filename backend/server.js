@@ -235,7 +235,31 @@ app.post('/api/send-messages', async (req, res) => {
     }
 
     try {
-        const results = await Promise.all(messages.map(async (msg) => {
+        // Filter out messages for parties marked with 'n' or 'N'
+        const filteredMessages = messages.filter(msg => {
+            // Check if the message contains any indication of 'n' or 'N' in the content
+            const messageLines = msg.message.split('\n');
+            let shouldSkip = false;
+            
+            // Look for any line that might contain the send message flag
+            messageLines.forEach(line => {
+                if (line.toLowerCase().includes('send message: n')) {
+                    shouldSkip = true;
+                }
+            });
+
+            return !shouldSkip;
+        });
+
+        if (filteredMessages.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No messages to send after filtering',
+                results: []
+            });
+        }
+
+        const results = await Promise.all(filteredMessages.map(async (msg) => {
             const { country_code, number, message } = msg;
             
             if (!number || number.length < 10) {
@@ -259,7 +283,11 @@ app.post('/api/send-messages', async (req, res) => {
                 }
 
                 await client.sendMessage(fullNumber, message);
-                return { success: true, number: fullNumber };
+                return { 
+                    success: true, 
+                    number: fullNumber,
+                    message: 'Message sent successfully'
+                };
             } catch (error) {
                 return { 
                     success: false, 
@@ -269,7 +297,18 @@ app.post('/api/send-messages', async (req, res) => {
             }
         }));
 
-        res.json({ success: true, results });
+        // Add summary of filtered messages
+        const summary = {
+            totalMessages: messages.length,
+            messagesSent: filteredMessages.length,
+            messagesFiltered: messages.length - filteredMessages.length
+        };
+
+        res.json({ 
+            success: true, 
+            summary,
+            results 
+        });
     } catch (error) {
         console.error('Message sending error:', error);
         await resetClient();

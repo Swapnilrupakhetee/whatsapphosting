@@ -138,66 +138,74 @@ Thank you for your cooperation.`;
   };
 
 
-  const formatData = (jsonData) => {
-    setIsPhoneNumberProcessing(true); // Start loading
+ const formatData = (jsonData) => {
+    setIsPhoneNumberProcessing(true);
     let formattedEntries = [];
     let currentParty = null;
     let missingParties = new Set();
+    let skipCurrentParty = false; // Track whether to skip the current party
 
-    try{
-    // Helper function to convert Excel serial number to date string
-    const excelSerialToDate = (serial) => {
+    try {
+      const excelSerialToDate = (serial) => {
         if (!serial) return '';
         const date = new Date((serial - 25569) * 86400 * 1000);
         return date.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
         });
-    };
-    const getPhoneNumber = (partyName) => {
-      if (!Array.isArray(phoneNumberData) || !partyName) {
-       
-        return null;
-      }
-    
-      const normalizedPartyName = partyName.trim().toLowerCase();
-      
-      
-      const contact = phoneNumberData.find(entry => {
-        const entryName = entry["Name of Ledger"]?.trim().toLowerCase();
-        
-        return entryName === normalizedPartyName;
-      });
-    
-      
-      return contact ? contact.phone_number : null;
-    };
-  
- 
+      };
 
+      const getPhoneNumber = (partyName) => {
+        if (!Array.isArray(phoneNumberData) || !partyName) {
+          return null;
+        }
+        const normalizedPartyName = partyName.trim().toLowerCase();
+        const contact = phoneNumberData.find(entry => {
+          const entryName = entry["Name of Ledger"]?.trim().toLowerCase();
+          return entryName === normalizedPartyName;
+        });
+        return contact ? contact.phone_number : null;
+      };
 
-    // Find the date range column (Bills Receivable)
-    const dateRangeKey = Object.keys(jsonData[0]).find(key => 
+      const dateRangeKey = Object.keys(jsonData[0]).find(key => 
         key.toLowerCase().includes('bills receivable')
-    );
+      );
 
-    jsonData.forEach((row) => {
-      if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
+      // First pass: identify parties to skip
+      const partiesToSkip = new Set();
+      let tempCurrentParty = null;
+
+      jsonData.forEach((row) => {
+        if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
+          tempCurrentParty = row.__EMPTY_2;
+        } else if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
+          // Get the value from the "send message" column
+          const lastValue = Object.values(row)[Object.values(row).length - 1];
+          if (typeof lastValue === 'string' && lastValue.toLowerCase() === 'n') {
+            partiesToSkip.add(tempCurrentParty);
+          }
+        }
+      });
+
+      // Second pass: process data excluding skipped parties
+      jsonData.forEach((row) => {
+        if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
           currentParty = row.__EMPTY_2;
+          skipCurrentParty = partiesToSkip.has(currentParty);
           return;
-      }
+        }
 
-      if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
+        if (!skipCurrentParty && row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
           const phoneNumber = getPhoneNumber(currentParty);
           
           if (!phoneNumber) {
-              missingParties.add(currentParty);
+            missingParties.add(currentParty);
           }
           
           const entry = {
             partyName: currentParty,
-            phoneNumber: phoneNumber, // Add phone number here
+            phoneNumber: phoneNumber,
             date: excelSerialToDate(row[dateRangeKey]),
             miti: row.__EMPTY || '',
             refNo: row.__EMPTY_1 || '',
@@ -206,62 +214,71 @@ Thank you for your cooperation.`;
             dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
             ageOfBill: row.__EMPTY_6 || ''
           };
-            // Only add entries that have actual data
-            if (entry.date && entry.pendingAmount) {
-                formattedEntries.push(entry);
-            }
+
+          if (entry.date && entry.pendingAmount) {
+            formattedEntries.push(entry);
+          }
         }
-    });
-    setMissingEntries(Array.from(missingParties));
-  }
-  finally{
-    setIsPhoneNumberProcessing(false);
-  }
-    return formattedEntries;
-};
+      });
 
-
-const prepareWhatsAppData = (formattedEntries) => {
-  const groupedByParty = formattedEntries.reduce((acc, entry) => {
-    if (!acc[entry.partyName]) {
-      acc[entry.partyName] = {
-        entries: [],
-        phoneNumber: entry.phoneNumber // Store phone number from entry
-      };
+      setMissingEntries(Array.from(missingParties));
+    } finally {
+      setIsPhoneNumberProcessing(false);
     }
-    acc[entry.partyName].entries.push(entry);
-    return acc;
-  }, {});
+    return formattedEntries;
+  };
 
-  const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
-    const totalPending = partyData.entries
-      .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
 
-    const detailedContent = partyData.entries.map(entry => 
-      `Bill Date: ${entry.date}\n` +
-      `Reference: ${entry.refNo}\n` +
-      `Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 2
-      })}\n` +
-      `Due Date: ${entry.dueOn}\n` +
-      (entry.ageOfBill ? `Days Overdue: ${entry.ageOfBill}\n` : '') +
-      '----------------------------------------'
-    ).join('\n');
 
-    return {
-      partyName,
-      phoneNumber: partyData.phoneNumber,
-      outstandingAmount: totalPending.toLocaleString('en-IN', {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 2
-      }),
-      detailedContent
-    };
-  });
+  const prepareWhatsAppData = (formattedEntries) => {
+    const filteredEntries = formattedEntries.filter(entry => {
+      const age = parseInt(entry.ageOfBill, 10);
+      return !isNaN(age) && age > 90;
+    });
 
-  return summaries;
-};
+    const groupedByParty = filteredEntries.reduce((acc, entry) => {
+      if (!acc[entry.partyName]) {
+        acc[entry.partyName] = {
+          entries: [],
+          phoneNumber: entry.phoneNumber
+        };
+      }
+      acc[entry.partyName].entries.push(entry);
+      return acc;
+    }, {});
+
+    const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
+      if (partyData.entries.length === 0) return null;
+
+      const totalPending = partyData.entries
+        .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
+
+      const detailedContent = partyData.entries.map(entry => 
+        `Bill Date: ${entry.date}\n` +
+        `Reference: ${entry.refNo}\n` +
+        `Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        })}\n` +
+        `Due Date: ${entry.dueOn}\n` +
+        `Days Overdue: ${entry.ageOfBill}\n` +
+        '----------------------------------------'
+      ).join('\n');
+
+      return {
+        partyName,
+        phoneNumber: partyData.phoneNumber,
+        outstandingAmount: totalPending.toLocaleString('en-IN', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        }),
+        detailedContent
+      };
+    }).filter(Boolean);
+
+    return summaries;
+  };
+
 
 
 const handleFileUpload = (files) => {
@@ -285,7 +302,14 @@ const handleFileUpload = (files) => {
       setParsedData(formattedData);
 
       const summaries = prepareWhatsAppData(formattedData);
-      setWhatsappMessages(summaries);
+      if (summaries.length === 0) {
+        setStatus('No bills found that are more than 90 days overdue');
+        toast.info('No bills found that are more than 90 days overdue');
+      } else {
+        setStatus(`Found ${summaries.length} parties with bills over 90 days overdue`);
+        setWhatsappMessages(summaries);
+      }
+
 
       // Group the data by party and include phone numbers
       const groupedData = formattedData.reduce((acc, entry) => {
