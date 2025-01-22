@@ -138,13 +138,12 @@ Thank you for your cooperation.`;
   };
 
 
- const formatData = (jsonData) => {
+  const formatData = (jsonData) => {
     setIsPhoneNumberProcessing(true);
     let formattedEntries = [];
     let currentParty = null;
     let missingParties = new Set();
-    let skipCurrentParty = false; // Track whether to skip the current party
-
+    
     try {
       const excelSerialToDate = (serial) => {
         if (!serial) return '';
@@ -155,7 +154,7 @@ Thank you for your cooperation.`;
           year: 'numeric'
         });
       };
-
+  
       const getPhoneNumber = (partyName) => {
         if (!Array.isArray(phoneNumberData) || !partyName) {
           return null;
@@ -167,60 +166,52 @@ Thank you for your cooperation.`;
         });
         return contact ? contact.phone_number : null;
       };
-
+  
       const dateRangeKey = Object.keys(jsonData[0]).find(key => 
         key.toLowerCase().includes('bills receivable')
       );
-
-      // First pass: identify parties to skip
-      const partiesToSkip = new Set();
-      let tempCurrentParty = null;
-
-      jsonData.forEach((row) => {
-        if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
-          tempCurrentParty = row.__EMPTY_2;
-        } else if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
-          // Get the value from the "send message" column
-          const lastValue = Object.values(row)[Object.values(row).length - 1];
-          if (typeof lastValue === 'string' && lastValue.toLowerCase() === 'n') {
-            partiesToSkip.add(tempCurrentParty);
-          }
-        }
-      });
-
-      // Second pass: process data excluding skipped parties
+  
       jsonData.forEach((row) => {
         if (row.__EMPTY_2 && !row[dateRangeKey] && !row.__EMPTY_3) {
           currentParty = row.__EMPTY_2;
-          skipCurrentParty = partiesToSkip.has(currentParty);
           return;
         }
-
-        if (!skipCurrentParty && row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
+  
+        if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
           const phoneNumber = getPhoneNumber(currentParty);
           
           if (!phoneNumber) {
             missingParties.add(currentParty);
           }
           
-          const entry = {
-            partyName: currentParty,
-            phoneNumber: phoneNumber,
-            date: excelSerialToDate(row[dateRangeKey]),
-            miti: row.__EMPTY || '',
-            refNo: row.__EMPTY_1 || '',
-            pendingAmount: parseFloat(row.__EMPTY_3) || 0,
-            finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
-            dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
-            ageOfBill: row.__EMPTY_6 || ''
-          };
-
-          if (entry.date && entry.pendingAmount) {
-            formattedEntries.push(entry);
+          // Get the last column value for "send message"
+          const values = Object.values(row);
+          const sendMessage = values[values.length - 1];
+          const chequeReceivedOn = values[values.length - 2] || '';
+  
+          // Only add entry if sendMessage is not 'n' or 'N'
+          if (typeof sendMessage !== 'string' || !['n', 'N'].includes(sendMessage.trim())) {
+            const entry = {
+              partyName: currentParty,
+              phoneNumber: phoneNumber,
+              date: excelSerialToDate(row[dateRangeKey]),
+              miti: row.__EMPTY || '',
+              refNo: row.__EMPTY_1 || '',
+              pendingAmount: parseFloat(row.__EMPTY_3) || 0,
+              finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
+              dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
+              ageOfBill: row.__EMPTY_6 || '',
+              chequeReceivedOn: chequeReceivedOn ? excelSerialToDate(chequeReceivedOn) : '',
+              sendMessage: sendMessage
+            };
+  
+            if (entry.date && entry.pendingAmount) {
+              formattedEntries.push(entry);
+            }
           }
         }
       });
-
+  
       setMissingEntries(Array.from(missingParties));
     } finally {
       setIsPhoneNumberProcessing(false);
@@ -235,7 +226,7 @@ Thank you for your cooperation.`;
       const age = parseInt(entry.ageOfBill, 10);
       return !isNaN(age) && age > 90;
     });
-
+  
     const groupedByParty = filteredEntries.reduce((acc, entry) => {
       if (!acc[entry.partyName]) {
         acc[entry.partyName] = {
@@ -246,13 +237,13 @@ Thank you for your cooperation.`;
       acc[entry.partyName].entries.push(entry);
       return acc;
     }, {});
-
+  
     const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
       if (partyData.entries.length === 0) return null;
-
+  
       const totalPending = partyData.entries
         .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
-
+  
       const detailedContent = partyData.entries.map(entry => 
         `Bill Date: ${entry.date}\n` +
         `Reference: ${entry.refNo}\n` +
@@ -262,9 +253,10 @@ Thank you for your cooperation.`;
         })}\n` +
         `Due Date: ${entry.dueOn}\n` +
         `Days Overdue: ${entry.ageOfBill}\n` +
+        (entry.chequeReceivedOn ? `Cheque Received On: ${entry.chequeReceivedOn}\n` : '') +
         '----------------------------------------'
       ).join('\n');
-
+  
       return {
         partyName,
         phoneNumber: partyData.phoneNumber,
@@ -275,7 +267,7 @@ Thank you for your cooperation.`;
         detailedContent
       };
     }).filter(Boolean);
-
+  
     return summaries;
   };
 
