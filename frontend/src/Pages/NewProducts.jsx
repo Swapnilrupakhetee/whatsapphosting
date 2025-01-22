@@ -19,6 +19,8 @@ const NewProducts = () => {
     const [qrCode, setQrCode] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
+    const [customMessage, setCustomMessage] = useState('');
+
     const fileInputRef = useRef(null);
     const API_URL = 'http://localhost:5000';
 
@@ -193,12 +195,12 @@ const NewProducts = () => {
                 messages: filteredData,
                 imagePaths: imagePaths,
                 category: selectedCategory,
+                customMessage: customMessage.trim()
             });
     
             if (response.data.success) {
                 setStatus('Messages sent successfully!');
                 toast.success(`Messages sent to ${filteredData.length} recipients in ${selectedCategory === 'all' ? 'all categories' : `category: ${selectedCategory}`}`);
-              
             }
         } catch (error) {
             handleError(error);
@@ -283,7 +285,13 @@ const NewProducts = () => {
                     readOnly
                 />
             </div>
-       
+            <div className="message-container">
+            <textarea
+              value={setCustomMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+              placeholder="Enter your custom message here. Use {name}, {category}, {price}, and {minQuantity} as placeholders."
+            />
+           </div>
 
                 <div className="image-upload-container">
                     <ImageUpload

@@ -329,7 +329,7 @@ app.post('/api/send-product-messages', async (req, res) => {
         });
     }
 
-    const { messages, imagePaths } = req.body;
+    const { messages, imagePaths, customMessage } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ success: false, error: 'Invalid message data' });
@@ -360,11 +360,20 @@ app.post('/api/send-product-messages', async (req, res) => {
                     };
                 }
 
-                const textMessage = `Dear ${name},\n\n` +
-                    `New product in ${category}!\n` +
-                    `Price: NPR ${price.toLocaleString()}\n` +
-                    `Min Quantity: ${minQuantity.toLocaleString()} units\n\n` +
-                    `See images below:`;
+                let textMessage;
+                if (customMessage) {
+                    textMessage = customMessage
+                        .replace(/{name}/g, name)
+                        .replace(/{category}/g, category)
+                        .replace(/{price}/g, price.toLocaleString())
+                        .replace(/{minQuantity}/g, minQuantity.toLocaleString());
+                } else {
+                    textMessage = `Dear ${name},\n\n` +
+                        `New product in ${category}!\n` +
+                        `Price: NPR ${price.toLocaleString()}\n` +
+                        `Min Quantity: ${minQuantity.toLocaleString()} units\n\n` +
+                        `See images below:`;
+                }
 
                 await client.sendMessage(whatsappId, textMessage);
 
@@ -380,6 +389,7 @@ app.post('/api/send-product-messages', async (req, res) => {
                         }
                     }
                 }
+
 
                 return {
                     success: true,
