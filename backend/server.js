@@ -296,7 +296,9 @@ app.post('/api/send-messages', async (req, res) => {
                 };
             }
         }));
-
+        setTimeout(async () => {
+            await disconnectAndUnlink();
+        }, 10000);
         // Add summary of filtered messages
         const summary = {
             totalMessages: messages.length,
