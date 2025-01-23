@@ -287,7 +287,7 @@ const NewProducts = () => {
             </div>
             <div className="message-container">
             <textarea
-              value={setCustomMessage}
+              value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
               placeholder="Enter your custom message here. Use {name}, {category}, {price}, and {minQuantity} as placeholders."
             />
