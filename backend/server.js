@@ -28,6 +28,10 @@ app.use(express.urlencoded({ extended: true }));
 
 
 app.use('/api/info', infoRoutes);
+
+app.get("/",(req,res)=>{
+    res.json("Hello");
+})
 // State management
 let client = null;
 let qrCodeData = null;
