@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { FaCircleInfo } from "react-icons/fa6";
 
 const NewProducts = () => {
     const [parsedData, setParsedData] = useState([]);
@@ -292,6 +293,10 @@ const NewProducts = () => {
               placeholder="Enter your custom message here. Use {name}, {category}, {price}, and {minQuantity} as placeholders."
             />
            </div>
+           <div className='custom-msg-info'>
+           <FaCircleInfo />
+  {"To write Custom Messages use these parameters {name}, {category}, {price}, and {minQuantity}"}
+</div>
 
                 <div className="image-upload-container">
                     <ImageUpload

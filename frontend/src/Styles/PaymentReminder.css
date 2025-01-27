@@ -115,6 +115,17 @@
     border-radius: 10px;
     resize: none;
   }  
+  .custom-msg-info{
+    display: flex;
+    gap: 10px;
+    padding: 5px 20px;
+    background-color: #25D366;
+    border-radius: 5px;
+    align-items: center;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+  }
   @keyframes loadingDots {
     0%, 100% { opacity: 0.2; }
     50% { opacity: 1; }
