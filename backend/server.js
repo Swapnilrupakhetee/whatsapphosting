@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const connectDB = require('./config/db');
 const app = express();
-const port = 5000;
+const port = 3000;
 const dotenv = require('dotenv');
 const infoRoutes= require('./router/infoRouter');
 

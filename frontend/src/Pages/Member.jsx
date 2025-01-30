@@ -26,13 +26,13 @@ const Member = () => {
         { under_value: "Sundry Debtors Vishal Ji", phone_number: "9844781086" }
     ];
 
-    const baseURL = 'http://localhost:5000/api/info';
+    const baseURL = `${import.meta.env.VITE_REACT_APP_BACKEND_BASEURL}/api/info`;
 
     // Fetch all members
     const fetchMembers = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${baseURL}/`);
+            const response = await axios.get(baseURL);
             setMembers(response.data.data);
         } catch (err) {
             setError(err.message);
@@ -75,7 +75,7 @@ const Member = () => {
                 await axios.put(`${baseURL}/${editingId}`, formData);
                 setEditingId(null);
             } else {
-                await axios.post(`${baseURL}/`, formData);
+                await axios.post(baseURL, formData);
             }
             setFormData({ "Name of Ledger": '', "Under": '', "phone_number": '' });
             fetchMembers();

@@ -23,7 +23,7 @@ const NewProducts = () => {
     const [customMessage, setCustomMessage] = useState('');
 
     const fileInputRef = useRef(null);
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL;
 
     const handleFileUpload = (files) => {
         const file = files[0];

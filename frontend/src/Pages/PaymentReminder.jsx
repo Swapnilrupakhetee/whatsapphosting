@@ -28,7 +28,7 @@ const PaymentReminder = () => {
 
 
   const fileInputRef = useRef(null);
-  const API_URL = 'http://localhost:5000';
+  const API_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL;
   const CHUNK_SIZE = 10;
 
 
@@ -116,13 +116,14 @@ Thank you for your cooperation.`;
       setStatus('Sending consolidated messages...');
       const consolidated = consolidateMessages(messages);
       
-      const response = await fetch('http://localhost:5000/api/send-messages', {
+      const response = await fetch(`${API_URL}/api/send-messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ messages: consolidated }),
       });
+
 
       const result = await response.json();
       
