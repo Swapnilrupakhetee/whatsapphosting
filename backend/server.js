@@ -17,10 +17,10 @@ const infoRoutes= require('./router/infoRouter');
 dotenv.config();
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://whatsapphosting-14se.vercel.app'],
+    origin: true, // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
-  }));
+}));
 
 
   app.use((err, req, res, next) => {
