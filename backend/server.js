@@ -151,7 +151,7 @@ const initializeWhatsApp = async () => {
                 if (revisionInfo && revisionInfo.executablePath) {
                     browser = await puppeteer.launch({
                         ...browserOptions,
-                        executablePath: revisionInfo.executablePath
+                        executablePath: 'C:\\Users\\pawsl\\chrome\\win64-132.0.6834.159\\chrome-win64\\chrome.exe',
                     });
                 }
             } catch (downloadError) {
