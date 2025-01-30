@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const connectDB = require('./config/db');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 const dotenv = require('dotenv');
 const infoRoutes= require('./router/infoRouter');
 
@@ -16,10 +16,25 @@ const infoRoutes= require('./router/infoRouter');
 
 dotenv.config();
 
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://whatsapphosting-14se.vercel.app'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+  }));
 
 
-
+  app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({
+      success: false,
+      error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+    });
+  });
+  
+  // Add better error handling for MongoDB connection
+  connectDB().catch(err => {
+    console.error('MongoDB connection error:', err);
+  });
 
 app.use(express.json({
     limit: '2mb' // Reduced limit since we're sending one message at a time
