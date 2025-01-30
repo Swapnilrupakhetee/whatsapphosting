@@ -362,41 +362,86 @@ const handleFileUpload = (files) => {
 
 
 const generateQR = useCallback(async () => {
-      setIsLoading(true);
-      setError('');
-      setStatus('Generating QR Code...');
-      setQrCode('');
-      setIsClientReady(false);
-  
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-  
-      try {
-        console.log('Starting QR code request...');
-        const response = await axios.get(`${API_URL}/api/generate-qr`, {
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
-        });
-  
-        if (response.data.success && response.data.qrCode) {
-          setQrCode(response.data.qrCode);
-          setStatus('Scan the QR code with WhatsApp to connect');
-  
-          // Start polling for client ready status
-          startPollingClientStatus();
-        } else {
-          throw new Error('Invalid response format from server');
+  setIsLoading(true);
+  setError('');
+  setStatus('Generating QR Code...');
+  setQrCode('');
+  setIsClientReady(false);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    console.log('Starting QR code request...');
+    console.log('API URL being used:', API_URL); // Log the API URL
+
+    const response = await axios.get(`${API_URL}/api/generate-qr`, {
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+    }).catch(error => {
+      console.error('Axios request failed:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
         }
-      } catch (error) {
-        handleError(error);
-      } finally {
-        clearTimeout(timeoutId);
-        setIsLoading(false);
-      }
-    }, [API_URL]);
+      });
+      throw error;
+    });
+
+    console.log('Server response received:', {
+      status: response.status,
+      headers: response.headers,
+      data: response.data
+    });
+
+    if (response.data.success && response.data.qrCode) {
+      console.log('QR code successfully generated');
+      setQrCode(response.data.qrCode);
+      setStatus('Scan the QR code with WhatsApp to connect');
+
+      startPollingClientStatus();
+    } else {
+      console.error('Invalid response format:', response.data);
+      throw new Error('Invalid response format from server');
+    }
+  } catch (error) {
+    console.error('QR generation error:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      isAxiosError: error.isAxiosError,
+      response: error.response ? {
+        status: error.response.status,
+        data: error.response.data
+      } : null
+    });
+
+    if (error.name === 'AbortError') {
+      setError('Request timed out. Please try again.');
+    } else if (error.response) {
+      setError(`Server error: ${error.response.data.error || error.response.statusText}`);
+    } else if (error.request) {
+      setError('No response from server. Please check your connection.');
+    } else {
+      setError(`Error: ${error.message}`);
+    }
+
+    handleError(error);
+  } finally {
+    console.log('QR generation request completed');
+    clearTimeout(timeoutId);
+    setIsLoading(false);
+  }
+}, [API_URL]);
   
     const startPollingClientStatus = useCallback(async () => {
       const pollInterval = setInterval(async () => {

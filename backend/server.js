@@ -92,11 +92,14 @@ const upload = multer({
 
 // Initialize WhatsApp client
 const initializeWhatsApp = async () => {
+    console.log('Starting WhatsApp initialization...');
     if (isInitializing) {
+        console.log('Already initializing...');
         throw new Error('WhatsApp client is already initializing');
     }
 
     if (client && isClientReady) {
+        console.log('Client already ready');
         return client;
     }
 
@@ -104,8 +107,7 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        await resetClient();
-
+        console.log('Creating new WhatsApp client...');
         client = new Client({
             puppeteer: {
                 headless: true,
@@ -113,13 +115,18 @@ const initializeWhatsApp = async () => {
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--no-first-run'
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process'
                 ],
-                timeout: 120000
+                timeout: 120000,
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null
             }
         });
 
         client.on('qr', async (qr) => {
+            console.log('QR Code received');
             try {
                 qrCodeData = await qrcode.toDataURL(qr);
             } catch (err) {
@@ -129,26 +136,27 @@ const initializeWhatsApp = async () => {
         });
 
         client.on('ready', () => {
+            console.log('WhatsApp client is ready');
             isClientReady = true;
             connectionRetries = 0;
         });
 
-        client.on('disconnected', async () => {
+        client.on('auth_failure', (err) => {
+            console.error('Auth failure:', err);
             isClientReady = false;
-            if (connectionRetries < MAX_RETRIES) {
-                connectionRetries++;
-                setTimeout(async () => {
-                    await resetClient();
-                    await initializeWhatsApp();
-                }, 5000);
-            } else {
-                await resetClient();
-            }
         });
 
+        client.on('disconnected', async (reason) => {
+            console.log('Client disconnected:', reason);
+            isClientReady = false;
+            await resetClient();
+        });
+
+        console.log('Initializing client...');
         await client.initialize();
         return client;
     } catch (error) {
+        console.error('WhatsApp initialization error:', error);
         await resetClient();
         throw error;
     } finally {
@@ -196,8 +204,10 @@ app.post('/api/upload-images', upload.array('images', 5), async (req, res) => {
 
 // Generate QR code endpoint
 app.get('/api/generate-qr', async (req, res) => {
+    console.log('QR code generation requested');
     try {
         if (!client || !isClientReady) {
+            console.log('Initializing new WhatsApp client...');
             await initializeWhatsApp();
         }
 
@@ -206,17 +216,20 @@ app.get('/api/generate-qr', async (req, res) => {
         const waitTime = 1000;
 
         while (!qrCodeData && attempts < maxAttempts) {
+            console.log(`Waiting for QR code... Attempt ${attempts + 1}/${maxAttempts}`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             attempts++;
         }
 
         if (qrCodeData) {
+            console.log('QR code generated successfully');
             return res.json({
                 success: true,
                 qrCode: qrCodeData,
                 isReady: isClientReady
             });
         } else {
+            console.log('QR code generation timed out');
             await resetClient();
             return res.status(408).json({
                 success: false,
@@ -224,14 +237,15 @@ app.get('/api/generate-qr', async (req, res) => {
             });
         }
     } catch (error) {
+        console.error('Error in generate-qr endpoint:', error);
         await resetClient();
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
-
 // Send messages endpoint
 app.post('/api/send-messages', async (req, res) => {
     if (!isClientReady) {
@@ -513,6 +527,17 @@ const disconnectAndUnlink = async () => {
         }
     }
 };
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        clientStatus: {
+            exists: !!client,
+            isReady: isClientReady,
+            isInitializing,
+            retries: connectionRetries
+        }
+    });
+});
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
