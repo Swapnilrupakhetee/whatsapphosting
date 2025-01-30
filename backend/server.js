@@ -109,21 +109,18 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        // Configure Chrome for Vercel serverless environment
+        // Launch browser separately
         console.log('Launching browser...');
         browser = await puppeteer.launch({
+            headless: 'new',
             args: [
-                ...chrome.args,
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
                 '--disable-gpu',
-                '--single-process',
-                '--no-zygote'
+                '--window-size=1920x1080',
             ],
-            executablePath: await chrome.executablePath(),
-            headless: chrome.headless,
-            ignoreHTTPSErrors: true,
             defaultViewport: {
                 width: 1920,
                 height: 1080
@@ -131,42 +128,29 @@ const initializeWhatsApp = async () => {
         });
 
         console.log('Creating new WhatsApp client...');
+        // Create client without LocalAuth for now
         client = new Client({
             puppeteer: {
-                browser: browser, // Pass browser instance directly
+                browserWSEndpoint: browser.wsEndpoint(),
                 args: [
-                    ...chrome.args,
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
                     '--disable-gpu',
-                    '--single-process',
-                    '--no-zygote'
+                    '--window-size=1920x1080',
                 ],
-                executablePath: await chrome.executablePath(),
-                headless: chrome.headless,
                 defaultViewport: {
                     width: 1920,
                     height: 1080
                 }
-            },
-            webVersionCache: {
-                type: 'none' // Disable version cache for serverless
             }
         });
-
-        // Set up longer timeouts for serverless environment
-        client.options.puppeteer.timeout = 120000;
-        client.options.takeoverTimeoutMs = 120000;
 
         client.on('qr', async (qr) => {
             console.log('QR Code received');
             try {
-                qrCodeData = await qrcode.toDataURL(qr, {
-                    errorCorrectionLevel: 'H',
-                    margin: 1,
-                    scale: 8
-                });
+                qrCodeData = await qrcode.toDataURL(qr);
                 console.log('QR Code URL generated');
             } catch (err) {
                 console.error('QR Generation Error:', err);
@@ -189,6 +173,14 @@ const initializeWhatsApp = async () => {
         client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isClientReady = false;
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (err) {
+                    console.error('Error closing browser:', err);
+                }
+                browser = null;
+            }
             await resetClient();
         });
 
@@ -198,6 +190,14 @@ const initializeWhatsApp = async () => {
 
     } catch (error) {
         console.error('WhatsApp initialization error:', error);
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (err) {
+                console.error('Error closing browser:', err);
+            }
+            browser = null;
+        }
         await resetClient();
         throw error;
     } finally {
@@ -250,7 +250,6 @@ app.get('/api/generate-qr', async (req, res) => {
             console.log('Initializing new WhatsApp client...');
             try {
                 await initializeWhatsApp();
-                console.log('WhatsApp client initialized successfully');
             } catch (initError) {
                 console.error('Failed to initialize WhatsApp:', initError);
                 throw new Error(`WhatsApp initialization failed: ${initError.message}`);
