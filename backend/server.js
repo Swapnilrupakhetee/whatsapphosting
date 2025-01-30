@@ -250,6 +250,7 @@ app.get('/api/generate-qr', async (req, res) => {
             console.log('Initializing new WhatsApp client...');
             try {
                 await initializeWhatsApp();
+                console.log('WhatsApp client initialized successfully');
             } catch (initError) {
                 console.error('Failed to initialize WhatsApp:', initError);
                 throw new Error(`WhatsApp initialization failed: ${initError.message}`);
