@@ -2,7 +2,14 @@
   "installCommand": "npm install --legacy-peer-deps",
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" }
+    { 
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "installCommand": "npm install --legacy-peer-deps",
+        "maxDuration": 60
+      }
+    }
   ],
   "routes": [
     {
@@ -21,8 +28,11 @@
   ],
   "functions": {
     "api/**/*.js": {
-      "memory": 1024,
+      "memory": 3008,
       "maxDuration": 60
     }
+  },
+  "env": {
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
   }
 }

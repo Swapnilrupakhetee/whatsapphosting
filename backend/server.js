@@ -9,9 +9,13 @@ const fs = require('fs').promises;
 const connectDB = require('./config/db');
 const app = express();
 const port = process.env.PORT || 3000;
-const puppeteer = require('puppeteer');
+
 const dotenv = require('dotenv');
 const infoRoutes= require('./router/infoRouter');
+
+// At the top of your file, replace the puppeteer imports with:
+const puppeteer = require('puppeteer');
+
 
 let browser = null;
 let client = null;
@@ -109,32 +113,56 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        // Launch browser separately
         console.log('Launching browser...');
-        const browserOptions = {
+        let browserOptions = {
             headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--window-size=1920,1080',
             ],
             defaultViewport: {
                 width: 1920,
                 height: 1080
-            },
-            executablePath: process.env.NODE_ENV === 'production' 
-                ? process.env.PUPPETEER_EXECUTABLE_PATH 
-                : puppeteer.executablePath()
+            }
         };
 
-        browser = await puppeteer.launch(browserOptions);
+        // Try to find Chrome executable path
+        try {
+            const browserFetcher = puppeteer.createBrowserFetcher();
+            const revisionInfo = await browserFetcher.download(puppeteer.devices.length);
+            if (revisionInfo && revisionInfo.executablePath) {
+                browserOptions.executablePath = revisionInfo.executablePath;
+            }
+        } catch (error) {
+            console.log('Could not fetch specific Chrome version, will use system default');
+        }
+
+        console.log('Attempting to launch browser with options:', JSON.stringify(browserOptions, null, 2));
+        
+        // Launch browser with retry mechanism
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                browser = await puppeteer.launch(browserOptions);
+                console.log('Browser launched successfully');
+                break;
+            } catch (error) {
+                console.error(`Browser launch attempt failed. Retries left: ${retries - 1}`, error);
+                retries--;
+                if (retries === 0) {
+                    throw new Error(`Failed to launch browser after multiple attempts: ${error.message}`);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
 
         console.log('Creating new WhatsApp client...');
-        // Create client without LocalAuth for now
         client = new Client({
             puppeteer: {
-                browserWSEndpoint: browser.wsEndpoint(),
+                browser: browser,
                 args: browserOptions.args,
                 defaultViewport: browserOptions.defaultViewport
             },
@@ -169,14 +197,6 @@ const initializeWhatsApp = async () => {
         client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isClientReady = false;
-            if (browser) {
-                try {
-                    await browser.close();
-                } catch (err) {
-                    console.error('Error closing browser:', err);
-                }
-                browser = null;
-            }
             await resetClient();
         });
 
