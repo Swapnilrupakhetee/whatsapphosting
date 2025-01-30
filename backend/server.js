@@ -129,51 +129,43 @@ const initializeWhatsApp = async () => {
                 width: 1920,
                 height: 1080
             },
-            headless: true,
+            headless: "new",
             ignoreHTTPSErrors: true
         };
 
-        // First try local Chrome
+        let browser;
+        
+        // Try @sparticuz/chromium first for cloud environments
         try {
-            console.log('Attempting to launch with local Chrome...');
+            console.log('Attempting with @sparticuz/chromium...');
+            const executablePath = await chromium.executablePath();
             browser = await puppeteer.launch({
                 ...browserOptions,
-                // Remove executablePath to use local Chrome
+                executablePath,
+                args: [...browserOptions.args, '--disable-features=WebRtcHideLocalIpsWithMdns']
             });
-        } catch (localChromeError) {
-            console.log('Local Chrome launch failed, attempting with downloaded Chrome...');
+        } catch (cloudChromeError) {
+            console.error('Cloud Chrome launch failed:', cloudChromeError);
             
-            // If local Chrome fails, try downloading Chrome
+            // Fallback to local Chrome
             try {
-                const browserFetcher = puppeteer.createBrowserFetcher();
-                const revisionInfo = await browserFetcher.download(puppeteer.devices.length);
-                
-                if (revisionInfo && revisionInfo.executablePath) {
-                    browser = await puppeteer.launch({
-                        ...browserOptions,
-                        executablePath: 'C:\\Users\\pawsl\\chrome\\win64-132.0.6834.159\\chrome-win64\\chrome.exe',
-                    });
-                }
-            } catch (downloadError) {
-                console.error('Failed to download Chrome:', downloadError);
-                
-                // Last resort: try with @sparticuz/chromium
-                console.log('Attempting with @sparticuz/chromium...');
-                browserOptions.executablePath = await chromium.executablePath();
+                console.log('Attempting to launch with local Chrome...');
                 browser = await puppeteer.launch(browserOptions);
+            } catch (localChromeError) {
+                console.error('Local Chrome launch failed:', localChromeError);
+                throw new Error('Failed to initialize browser with any available method');
             }
         }
 
         if (!browser) {
-            throw new Error('Failed to initialize browser with any available method');
+            throw new Error('Failed to initialize browser');
         }
 
         console.log('Browser launched successfully');
 
-        console.log('Creating new WhatsApp client...');
         client = new Client({
             puppeteer: {
-                browser: browser,
+                browser,
                 args: browserOptions.args,
                 defaultViewport: browserOptions.defaultViewport
             },
@@ -182,6 +174,7 @@ const initializeWhatsApp = async () => {
             restartOnAuthFail: true
         });
 
+        // Improved error handling for client events
         client.on('qr', async (qr) => {
             console.log('QR Code received');
             try {
@@ -202,37 +195,28 @@ const initializeWhatsApp = async () => {
         client.on('auth_failure', async (err) => {
             console.error('Auth failure:', err);
             isClientReady = false;
-            await resetClient();
+            await resetClient(browser);
         });
 
         client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isClientReady = false;
-            await resetClient();
+            await resetClient(browser);
         });
 
-        console.log('Initializing client...');
         await client.initialize();
         return client;
 
     } catch (error) {
         console.error('WhatsApp initialization error:', error);
-        if (browser) {
-            try {
-                await browser.close();
-            } catch (err) {
-                console.error('Error closing browser:', err);
-            }
-            browser = null;
-        }
-        await resetClient();
+        await resetClient(browser);
         throw error;
     } finally {
         isInitializing = false;
     }
 };
 // Reset client
-const resetClient = async () => {
+const resetClient = async (browser) => {
     if (client) {
         try {
             await client.destroy();
@@ -240,11 +224,20 @@ const resetClient = async () => {
             console.error('Error destroying client:', error);
         }
     }
+    
+    if (browser) {
+        try {
+            await browser.close();
+        } catch (error) {
+            console.error('Error closing browser:', error);
+        }
+    }
+    
     client = null;
+    browser = null;
     qrCodeData = null;
     isClientReady = false;
 };
-
 // Handle image uploads
 app.post('/api/upload-images', upload.array('images', 5), async (req, res) => {
     try {
