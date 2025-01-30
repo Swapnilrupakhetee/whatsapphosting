@@ -15,7 +15,7 @@ const infoRoutes= require('./router/infoRouter');
 
 // At the top of your file, replace the puppeteer imports with:
 const puppeteer = require('puppeteer');
-
+const chromium = require('@sparticuz/chromium');
 
 let browser = null;
 let client = null;
@@ -113,51 +113,62 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        console.log('Launching browser...');
+        console.log('Setting up browser options...');
         let browserOptions = {
-            headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--window-size=1920,1080',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
             ],
             defaultViewport: {
                 width: 1920,
                 height: 1080
-            }
+            },
+            headless: true,
+            ignoreHTTPSErrors: true
         };
 
-        // Try to find Chrome executable path
+        // First try local Chrome
         try {
-            const browserFetcher = puppeteer.createBrowserFetcher();
-            const revisionInfo = await browserFetcher.download(puppeteer.devices.length);
-            if (revisionInfo && revisionInfo.executablePath) {
-                browserOptions.executablePath = revisionInfo.executablePath;
+            console.log('Attempting to launch with local Chrome...');
+            browser = await puppeteer.launch({
+                ...browserOptions,
+                // Remove executablePath to use local Chrome
+            });
+        } catch (localChromeError) {
+            console.log('Local Chrome launch failed, attempting with downloaded Chrome...');
+            
+            // If local Chrome fails, try downloading Chrome
+            try {
+                const browserFetcher = puppeteer.createBrowserFetcher();
+                const revisionInfo = await browserFetcher.download(puppeteer.devices.length);
+                
+                if (revisionInfo && revisionInfo.executablePath) {
+                    browser = await puppeteer.launch({
+                        ...browserOptions,
+                        executablePath: revisionInfo.executablePath
+                    });
+                }
+            } catch (downloadError) {
+                console.error('Failed to download Chrome:', downloadError);
+                
+                // Last resort: try with @sparticuz/chromium
+                console.log('Attempting with @sparticuz/chromium...');
+                browserOptions.executablePath = await chromium.executablePath();
+                browser = await puppeteer.launch(browserOptions);
             }
-        } catch (error) {
-            console.log('Could not fetch specific Chrome version, will use system default');
         }
 
-        console.log('Attempting to launch browser with options:', JSON.stringify(browserOptions, null, 2));
-        
-        // Launch browser with retry mechanism
-        let retries = 3;
-        while (retries > 0) {
-            try {
-                browser = await puppeteer.launch(browserOptions);
-                console.log('Browser launched successfully');
-                break;
-            } catch (error) {
-                console.error(`Browser launch attempt failed. Retries left: ${retries - 1}`, error);
-                retries--;
-                if (retries === 0) {
-                    throw new Error(`Failed to launch browser after multiple attempts: ${error.message}`);
-                }
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
+        if (!browser) {
+            throw new Error('Failed to initialize browser with any available method');
         }
+
+        console.log('Browser launched successfully');
 
         console.log('Creating new WhatsApp client...');
         client = new Client({
