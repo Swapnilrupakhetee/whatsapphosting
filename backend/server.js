@@ -9,10 +9,16 @@ const fs = require('fs').promises;
 const connectDB = require('./config/db');
 const app = express();
 const port = process.env.PORT || 3000;
+const puppeteer = require('puppeteer');
 const dotenv = require('dotenv');
 const infoRoutes= require('./router/infoRouter');
 
-
+let browser = null;
+let client = null;
+let isClientReady = false;
+let isInitializing = false;
+let qrCodeData = null;
+let connectionRetries = 0;
 
 dotenv.config();
 
@@ -48,12 +54,8 @@ app.get("/",(req,res)=>{
     res.json("Hello");
 })
 // State management
-let client = null;
-let qrCodeData = null;
-let isInitializing = false;
-let isClientReady = false;
-let connectionRetries = 0;
-const MAX_RETRIES = 3;
+
+
 
 // Configure multer for image uploads
 const storage = multer.diskStorage({
@@ -107,21 +109,41 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
+        // Launch browser separately
+        console.log('Launching browser...');
+        browser = await puppeteer.launch({
+            headless: 'new',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--window-size=1920x1080',
+            ],
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
+
         console.log('Creating new WhatsApp client...');
+        // Create client without LocalAuth for now
         client = new Client({
             puppeteer: {
-                headless: true,
+                browserWSEndpoint: browser.wsEndpoint(),
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
                     '--disable-gpu',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process'
+                    '--window-size=1920x1080',
                 ],
-                timeout: 120000,
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null
+                defaultViewport: {
+                    width: 1920,
+                    height: 1080
+                }
             }
         });
 
@@ -129,6 +151,7 @@ const initializeWhatsApp = async () => {
             console.log('QR Code received');
             try {
                 qrCodeData = await qrcode.toDataURL(qr);
+                console.log('QR Code URL generated');
             } catch (err) {
                 console.error('QR Generation Error:', err);
                 qrCodeData = null;
@@ -141,29 +164,46 @@ const initializeWhatsApp = async () => {
             connectionRetries = 0;
         });
 
-        client.on('auth_failure', (err) => {
+        client.on('auth_failure', async (err) => {
             console.error('Auth failure:', err);
             isClientReady = false;
+            await resetClient();
         });
 
         client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isClientReady = false;
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (err) {
+                    console.error('Error closing browser:', err);
+                }
+                browser = null;
+            }
             await resetClient();
         });
 
         console.log('Initializing client...');
         await client.initialize();
         return client;
+
     } catch (error) {
         console.error('WhatsApp initialization error:', error);
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (err) {
+                console.error('Error closing browser:', err);
+            }
+            browser = null;
+        }
         await resetClient();
         throw error;
     } finally {
         isInitializing = false;
     }
 };
-
 // Reset client
 const resetClient = async () => {
     if (client) {
@@ -208,7 +248,12 @@ app.get('/api/generate-qr', async (req, res) => {
     try {
         if (!client || !isClientReady) {
             console.log('Initializing new WhatsApp client...');
-            await initializeWhatsApp();
+            try {
+                await initializeWhatsApp();
+            } catch (initError) {
+                console.error('Failed to initialize WhatsApp:', initError);
+                throw new Error(`WhatsApp initialization failed: ${initError.message}`);
+            }
         }
 
         let attempts = 0;
@@ -239,10 +284,13 @@ app.get('/api/generate-qr', async (req, res) => {
     } catch (error) {
         console.error('Error in generate-qr endpoint:', error);
         await resetClient();
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            details: process.env.NODE_ENV === 'development' ? {
+                stack: error.stack,
+                puppeteerError: error.message.includes('puppeteer')
+            } : undefined
         });
     }
 });

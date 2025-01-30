@@ -173,7 +173,7 @@ const Member = () => {
             {error && <div className="error-message">{error}</div>}
 
             {loading ? (
-                <div className="loading">Loading...</div>
+                <div className="loading">Loading....</div>
             ) : (
                 <div className="table-container">
                     <table>
