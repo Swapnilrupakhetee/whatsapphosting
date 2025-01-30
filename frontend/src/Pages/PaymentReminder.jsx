@@ -565,7 +565,7 @@ const generateQR = useCallback(async () => {
     <div className="payment-reminder-container">
     <div className="payment-reminder-content">
       <div className="payment-reminder-title">
-        Payment Reminder <NotificationsActive />
+        Payment Reminder. <NotificationsActive />
       </div>
 
       <div className="drop-file">
