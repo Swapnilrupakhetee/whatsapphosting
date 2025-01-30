@@ -111,40 +111,36 @@ const initializeWhatsApp = async () => {
     try {
         // Launch browser separately
         console.log('Launching browser...');
-        browser = await puppeteer.launch({
+        const browserOptions = {
             headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
-                '--window-size=1920x1080',
+                '--disable-gpu'
             ],
             defaultViewport: {
                 width: 1920,
                 height: 1080
-            }
-        });
+            },
+            executablePath: process.env.NODE_ENV === 'production' 
+                ? process.env.PUPPETEER_EXECUTABLE_PATH 
+                : puppeteer.executablePath()
+        };
+
+        browser = await puppeteer.launch(browserOptions);
 
         console.log('Creating new WhatsApp client...');
         // Create client without LocalAuth for now
         client = new Client({
             puppeteer: {
                 browserWSEndpoint: browser.wsEndpoint(),
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--disable-gpu',
-                    '--window-size=1920x1080',
-                ],
-                defaultViewport: {
-                    width: 1920,
-                    height: 1080
-                }
-            }
+                args: browserOptions.args,
+                defaultViewport: browserOptions.defaultViewport
+            },
+            qrMaxRetries: 3,
+            authTimeoutMs: 60000,
+            restartOnAuthFail: true
         });
 
         client.on('qr', async (qr) => {
