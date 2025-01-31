@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { Client, MessageMedia } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const bodyParser = require('body-parser');
 const multer = require('multer');
@@ -113,68 +113,30 @@ const initializeWhatsApp = async () => {
     qrCodeData = null;
 
     try {
-        console.log('Setting up browser options...');
-        let browserOptions = {
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ],
-            defaultViewport: {
-                width: 1920,
-                height: 1080
-            },
-            headless: "new",
-            ignoreHTTPSErrors: true
-        };
-
-        let browser;
-        
-        // Try @sparticuz/chromium first for cloud environments
-        try {
-            console.log('Attempting with @sparticuz/chromium...');
-            const executablePath = await chromium.executablePath();
-            browser = await puppeteer.launch({
-                ...browserOptions,
-                executablePath,
-                args: [...browserOptions.args, '--disable-features=WebRtcHideLocalIpsWithMdns']
-            });
-        } catch (cloudChromeError) {
-            console.error('Cloud Chrome launch failed:', cloudChromeError);
-            
-            // Fallback to local Chrome
-            try {
-                console.log('Attempting to launch with local Chrome...');
-                browser = await puppeteer.launch(browserOptions);
-            } catch (localChromeError) {
-                console.error('Local Chrome launch failed:', localChromeError);
-                throw new Error('Failed to initialize browser with any available method');
-            }
-        }
-
-        if (!browser) {
-            throw new Error('Failed to initialize browser');
-        }
-
-        console.log('Browser launched successfully');
-
+        // Create client first, before browser initialization
         client = new Client({
+            authStrategy: new LocalAuth(),
             puppeteer: {
-                browser,
-                args: browserOptions.args,
-                defaultViewport: browserOptions.defaultViewport
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu'
+                ],
+                headless: "new",
+                // Remove product specification
+                // Don't pass browser instance here
             },
             qrMaxRetries: 3,
             authTimeoutMs: 60000,
             restartOnAuthFail: true
         });
 
-        // Improved error handling for client events
+        // Set up event handlers
         client.on('qr', async (qr) => {
             console.log('QR Code received');
             try {
@@ -195,21 +157,24 @@ const initializeWhatsApp = async () => {
         client.on('auth_failure', async (err) => {
             console.error('Auth failure:', err);
             isClientReady = false;
-            await resetClient(browser);
+            await resetClient();
         });
 
         client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isClientReady = false;
-            await resetClient(browser);
+            await resetClient();
         });
 
+        // Initialize the client
+        console.log('Initializing WhatsApp client...');
         await client.initialize();
+        
         return client;
 
     } catch (error) {
         console.error('WhatsApp initialization error:', error);
-        await resetClient(browser);
+        await resetClient();
         throw error;
     } finally {
         isInitializing = false;
