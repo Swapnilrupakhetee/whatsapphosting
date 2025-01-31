@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: whatsapp-api
+    env: node
+    buildCommand: npm install && npm install @sparticuz/chromium
+    startCommand: npm start

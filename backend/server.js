@@ -117,19 +117,14 @@ const initializeWhatsApp = async () => {
         client = new Client({
             authStrategy: new LocalAuth(),
             puppeteer: {
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu'
-                ],
-                headless: "new",
-                // Remove product specification
-                // Don't pass browser instance here
+                args: chromium.args,
+                defaultViewport: chromium.defaultViewport,
+                executablePath: await chromium.executablePath(),
+                headless: chromium.headless,
+                defaultViewport: {
+                    width: 1280,
+                    height: 800
+                }
             },
             qrMaxRetries: 3,
             authTimeoutMs: 60000,
