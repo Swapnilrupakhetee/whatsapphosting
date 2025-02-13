@@ -401,6 +401,7 @@ app.post('/api/send-messages', async (req, res) => {
 // Product message sending endpoint
 app.post('/api/send-product-messages', async (req, res) => {
     if (!isClientReady) {
+        console.error('WhatsApp client is not ready');
         return res.status(400).json({ 
             success: false, 
             error: 'WhatsApp client is not ready',
@@ -411,14 +412,17 @@ app.post('/api/send-product-messages', async (req, res) => {
     const { messages, imagePaths, customMessage } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
+        console.error('Invalid message data received');
         return res.status(400).json({ success: false, error: 'Invalid message data' });
     }
 
+    console.log('Starting to send messages...');
     try {
         const results = await Promise.all(messages.map(async (msg) => {
             const { number, countryCode, category, name, price, minQuantity } = msg;
             
             if (!number || !category || !name) {
+                console.error('Missing required fields for message:', msg);
                 return {
                     success: false,
                     error: 'Missing required fields',
@@ -427,10 +431,12 @@ app.post('/api/send-product-messages', async (req, res) => {
             }
 
             const whatsappId = `${countryCode}${number}@c.us`;
+            console.log(`Processing message for ${whatsappId}`);
 
             try {
                 const isRegistered = await client.isRegisteredUser(whatsappId);
                 if (!isRegistered) {
+                    console.error(`Number ${whatsappId} is not registered on WhatsApp`);
                     return {
                         success: false,
                         error: 'Number not registered on WhatsApp',
@@ -454,6 +460,7 @@ app.post('/api/send-product-messages', async (req, res) => {
                         `See images below:`;
                 }
 
+                console.log(`Sending message to ${whatsappId}:`, textMessage);
                 await client.sendMessage(whatsappId, textMessage);
 
                 if (Array.isArray(imagePaths) && imagePaths.length > 0) {
@@ -461,6 +468,7 @@ app.post('/api/send-product-messages', async (req, res) => {
                         try {
                             await fs.access(imagePath);
                             const media = MessageMedia.fromFilePath(imagePath);
+                            console.log(`Sending image to ${whatsappId}:`, imagePath);
                             await client.sendMessage(whatsappId, media);
                             await new Promise(resolve => setTimeout(resolve, 1000));
                         } catch (imageError) {
@@ -469,7 +477,6 @@ app.post('/api/send-product-messages', async (req, res) => {
                     }
                 }
 
-
                 return {
                     success: true,
                     number: number,
@@ -477,6 +484,7 @@ app.post('/api/send-product-messages', async (req, res) => {
                 };
 
             } catch (error) {
+                console.error(`Failed to send message to ${whatsappId}:`, error);
                 return {
                     success: false,
                     error: error.message,
@@ -505,6 +513,7 @@ app.post('/api/send-product-messages', async (req, res) => {
         const successful = results.filter(r => r.success).length;
         const failed = results.filter(r => !r.success).length;
 
+        console.log(`Message sending summary: ${successful} successful, ${failed} failed`);
         res.json({
             success: true,
             summary: {
@@ -516,6 +525,7 @@ app.post('/api/send-product-messages', async (req, res) => {
         });
 
     } catch (error) {
+        console.error('Error in send-product-messages endpoint:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to send messages',
