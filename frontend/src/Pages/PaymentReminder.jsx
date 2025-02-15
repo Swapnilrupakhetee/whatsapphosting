@@ -369,7 +369,7 @@ const generateQR = useCallback(async () => {
   setIsClientReady(false);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90000);
+  const timeoutId = setTimeout(() => controller.abort(), 1200000);
 
   try {
     console.log('Starting QR code request...');

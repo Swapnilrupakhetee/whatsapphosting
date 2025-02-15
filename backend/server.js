@@ -161,7 +161,7 @@ const initializeWhatsApp = async () => {
         defaultViewport: browserOptions.defaultViewport,
       },
       qrMaxRetries: 3,
-      authTimeoutMs: 120000,
+      authTimeoutMs: 240000,
       restartOnAuthFail: true,
     });
 
@@ -282,7 +282,7 @@ app.get('/api/generate-qr', async (req, res) => {
 
         let attempts = 0;
         const maxAttempts = 30;
-        const waitTime = 1000;
+        const waitTime = 100000;
 
         while (!qrCodeData && attempts < maxAttempts) {
             console.log(`Waiting for QR code... Attempt ${attempts + 1}/${maxAttempts}`);
