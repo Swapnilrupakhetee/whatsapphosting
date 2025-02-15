@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y \
 # Set Puppeteer to use the installed Chromium
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Set the working directory inside the container
 WORKDIR /app
 

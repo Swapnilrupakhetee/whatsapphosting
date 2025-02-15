@@ -112,7 +112,7 @@ const initializeWhatsApp = async () => {
         // Launch browser separately
         console.log('Launching browser...');
         const browserOptions = {
-            headless: 'new',
+            headless:true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
