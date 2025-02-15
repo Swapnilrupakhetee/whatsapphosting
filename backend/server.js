@@ -97,6 +97,17 @@ const upload = multer({
   },
 });
 
+const initializeWhatsAppOnStartup = async () => {
+    try {
+        console.log('Initializing WhatsApp client on startup...');
+        await initializeWhatsApp();
+        console.log('WhatsApp client initialized successfully.');
+    } catch (error) {
+        console.error('Failed to initialize WhatsApp client on startup:', error);
+    }
+};
+initializeWhatsAppOnStartup();
+
 // Initialize WhatsApp client
 const initializeWhatsApp = async () => {
   console.log("Starting WhatsApp initialization...");
@@ -118,7 +129,7 @@ const initializeWhatsApp = async () => {
     console.log("Launching browser...");
     try {
       const browserOptions = {
-        headless:false,
+        headless:true,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -249,61 +260,63 @@ app.post("/api/upload-images", upload.array("images", 5), async (req, res) => {
 });
 
 // Generate QR code endpoint
-app.get("/api/generate-qr", async (req, res) => {
-  console.log("QR code generation requested");
-  try {
-    if (!client || !isClientReady) {
-      console.log("Initializing new WhatsApp client...");
-      try {
-        await initializeWhatsApp();
-      } catch (initError) {
-        console.error("Failed to initialize WhatsApp:", initError);
-        throw new Error(`WhatsApp initialization failed: ${initError.message}`);
-      }
-    }
-
-    let attempts = 0;
-    const maxAttempts = 30;
-    const waitTime = 1000;
-
-    while (!qrCodeData && attempts < maxAttempts) {
-      console.log(
-        `Waiting for QR code... Attempt ${attempts + 1}/${maxAttempts}`
-      );
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-      attempts++;
-    }
-
-    if (qrCodeData) {
-      console.log("QR code generated successfully");
-      return res.json({
-        success: true,
-        qrCode: qrCodeData,
-        isReady: isClientReady,
-      });
-    } else {
-      console.log("QR code generation timed out");
-      await resetClient();
-      return res.status(408).json({
-        success: false,
-        error: "QR code generation timeout",
-      });
-    }
-  } catch (error) {
-    console.error("Error in generate-qr endpoint:", error);
-    await resetClient();
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      details:
-        process.env.NODE_ENV === "development"
-          ? {
-              stack: error.stack,
-              puppeteerError: error.message.includes("puppeteer"),
+app.get('/api/generate-qr', async (req, res) => {
+    console.log('QR code generation requested');
+    try {
+        if (!client || !isClientReady) {
+            console.log('Initializing new WhatsApp client...');
+            try {
+                await initializeWhatsApp();
+            } catch (initError) {
+                console.error('Failed to initialize WhatsApp:', initError);
+                return res.status(500).json({
+                    success: false,
+                    error: 'WhatsApp initialization failed',
+                    details: process.env.NODE_ENV === 'development' ? {
+                        stack: initError.stack,
+                        puppeteerError: initError.message.includes('puppeteer')
+                    } : undefined
+                });
             }
-          : undefined,
-    });
-  }
+        }
+
+        let attempts = 0;
+        const maxAttempts = 30;
+        const waitTime = 1000;
+
+        while (!qrCodeData && attempts < maxAttempts) {
+            console.log(`Waiting for QR code... Attempt ${attempts + 1}/${maxAttempts}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            attempts++;
+        }
+
+        if (qrCodeData) {
+            console.log('QR code generated successfully');
+            return res.json({
+                success: true,
+                qrCode: qrCodeData,
+                isReady: isClientReady
+            });
+        } else {
+            console.log('QR code generation timed out');
+            await resetClient();
+            return res.status(408).json({
+                success: false,
+                error: 'QR code generation timeout'
+            });
+        }
+    } catch (error) {
+        console.error('Error in generate-qr endpoint:', error);
+        await resetClient();
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? {
+                stack: error.stack,
+                puppeteerError: error.message.includes('puppeteer')
+            } : undefined
+        });
+    }
 });
 // Send messages endpoint
 app.post("/api/send-messages", async (req, res) => {
