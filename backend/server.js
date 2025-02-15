@@ -161,7 +161,7 @@ const initializeWhatsApp = async () => {
         defaultViewport: browserOptions.defaultViewport,
       },
       qrMaxRetries: 3,
-      authTimeoutMs: 60000,
+      authTimeoutMs: 120000,
       restartOnAuthFail: true,
     });
 
