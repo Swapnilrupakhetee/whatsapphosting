@@ -110,116 +110,107 @@ initializeWhatsAppOnStartup();
 
 // Initialize WhatsApp client
 const initializeWhatsApp = async () => {
-  console.log("Starting WhatsApp initialization...");
-  if (isInitializing) {
-    console.log("Already initializing...");
-    throw new Error("WhatsApp client is already initializing");
-  }
-
-  if (client && isClientReady) {
-    console.log("Client already ready");
-    return client;
-  }
-
-  isInitializing = true;
-  qrCodeData = null;
-
-  try {
-    // Launch browser separately
-    console.log("Launching browser...");
+    console.log('Starting WhatsApp initialization...');
+    if (isInitializing) {
+        console.log('Already initializing...');
+        throw new Error("WhatsApp client is already initializing");
+    }
+    if (client && isClientReady) {
+        console.log('Client already ready');
+        return client;
+    }
+    isInitializing = true;
+    qrCodeData = null;
     try {
-      const browserOptions = {
-        headless:true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-        ],
-        defaultViewport: {
-          width: 1920,
-          height: 1080,
-        },
-        executablePath:
-          process.env.NODE_ENV === "production"
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : puppeteer.executablePath(),
-      };
-      browser = await puppeteer.launch(browserOptions);
-      console.log("Browser launched successfully");
+        // Launch browser separately
+        console.log('Launching browser...');
+        const browserOptions = {
+            headless: process.env.NODE_ENV === 'production' ? 'new' : false,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu'
+            ],
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            },
+            executablePath: process.env.NODE_ENV === 'production' 
+                ? process.env.PUPPETEER_EXECUTABLE_PATH 
+                : puppeteer.executablePath()
+        };
+        browser = await puppeteer.launch(browserOptions);
+        console.log('Browser launched successfully');
+
+        console.log('Creating new WhatsApp client...');
+        client = new Client({
+            puppeteer: {
+                browserWSEndpoint: browser.wsEndpoint(),
+                args: browserOptions.args,
+                defaultViewport: browserOptions.defaultViewport
+            },
+            authStrategy: new LocalAuth({ dataPath: './sessions' }),
+            qrMaxRetries: 3,
+            authTimeoutMs: 240000, // Increased timeout to 4 minutes
+            restartOnAuthFail: true
+        });
+
+        client.on("qr", async (qr) => {
+            console.log('QR Code received');
+            try {
+                qrCodeData = await qrcode.toDataURL(qr);
+                console.log('QR Code URL generated');
+            } catch (err) {
+                console.error('QR Generation Error:', err);
+                qrCodeData = null;
+            }
+        });
+
+        client.on("ready", () => {
+            console.log('WhatsApp client is ready');
+            isClientReady = true;
+            connectionRetries = 0;
+        });
+
+        client.on("auth_failure", async (err) => {
+            console.error('Auth failure:', err);
+            isClientReady = false;
+            await resetClient();
+        });
+
+        client.on("disconnected", async (reason) => {
+            console.log('Client disconnected:', reason);
+            isClientReady = false;
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (err) {
+                    console.error('Error closing browser:', err);
+                }
+                browser = null;
+            }
+            await resetClient();
+        });
+
+        console.log('Initializing client...');
+        await client.initialize();
+        return client;
     } catch (error) {
-      console.error("Failed to launch browser:", error);
-      throw error;
-    }
-
-    console.log("Creating new WhatsApp client...");
-    // Create client without LocalAuth for now
-    client = new Client({
-      puppeteer: {
-        browserWSEndpoint: browser.wsEndpoint(),
-        args: browserOptions.args,
-        defaultViewport: browserOptions.defaultViewport,
-      },
-      qrMaxRetries: 3,
-      authTimeoutMs: 240000,
-      restartOnAuthFail: true,
-    });
-
-    client.on("qr", async (qr) => {
-      console.log("QR Code received");
-      try {
-        qrCodeData = await qrcode.toDataURL(qr);
-        console.log("QR Code URL generated");
-      } catch (err) {
-        console.error("QR Generation Error:", err);
-        qrCodeData = null;
-      }
-    });
-
-    client.on("ready", () => {
-      console.log("WhatsApp client is ready");
-      isClientReady = true;
-      connectionRetries = 0;
-    });
-
-    client.on("auth_failure", async (err) => {
-      console.error("Auth failure:", err);
-      isClientReady = false;
-      await resetClient();
-    });
-
-    client.on("disconnected", async (reason) => {
-      console.log("Client disconnected:", reason);
-      isClientReady = false;
-      if (browser) {
-        try {
-          await browser.close();
-        } catch (err) {
-          console.error("Error closing browser:", err);
+        console.error('WhatsApp initialization error:', error);
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (err) {
+                console.error('Error closing browser:', err);
+            }
+            browser = null;
         }
-        browser = null;
-      }
-      await resetClient();
-    });
-
-    console.log("Initializing client...");
-    await client.initialize();
-    return client;
-  } catch (error) {
-    console.error("WhatsApp initialization error:", error);
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (err) {
-        console.error("Error closing browser:", err);
-      }
-      browser = null;
+        await resetClient();
+        throw error;
+    } finally {
+        isInitializing = false;
     }
-    await resetClient();
-    throw error;
-  } finally {
-    isInitializing = false;
-  }
 };
 // Reset client
 const resetClient = async () => {
