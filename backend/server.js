@@ -138,7 +138,8 @@ const initializeWhatsApp = async () => {
             },
             executablePath: process.env.NODE_ENV === 'production' 
                 ? process.env.PUPPETEER_EXECUTABLE_PATH 
-                : puppeteer.executablePath()
+                : puppeteer.executablePath(),
+                timeout: 240000 
         };
         browser = await puppeteer.launch(browserOptions);
         console.log('Browser launched successfully');
@@ -148,7 +149,8 @@ const initializeWhatsApp = async () => {
             puppeteer: {
                 browserWSEndpoint: browser.wsEndpoint(),
                 args: browserOptions.args,
-                defaultViewport: browserOptions.defaultViewport
+                defaultViewport: browserOptions.defaultViewport,
+                timeout: 240000
             },
            
             qrMaxRetries: 3,
