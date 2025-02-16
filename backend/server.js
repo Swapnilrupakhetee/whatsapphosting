@@ -150,7 +150,7 @@ const initializeWhatsApp = async () => {
                 args: browserOptions.args,
                 defaultViewport: browserOptions.defaultViewport
             },
-            authStrategy: new LocalAuth({ dataPath: './sessions' }),
+           
             qrMaxRetries: 3,
             authTimeoutMs: 240000, // Increased timeout to 4 minutes
             restartOnAuthFail: true
@@ -162,7 +162,7 @@ const initializeWhatsApp = async () => {
                 qrCodeData = await qrcode.toDataURL(qr);
                 console.log('QR Code URL generated');
             } catch (err) {
-                console.error('QR Generation Error:', err);
+                console.error('QR Generation Error', err);
                 qrCodeData = null;
             }
         });
@@ -273,7 +273,7 @@ app.get('/api/generate-qr', async (req, res) => {
 
         let attempts = 0;
         const maxAttempts = 30;
-        const waitTime = 100000;
+        const waitTime = 120000;
 
         while (!qrCodeData && attempts < maxAttempts) {
             console.log(`Waiting for QR code... Attempt ${attempts + 1}/${maxAttempts}`);
