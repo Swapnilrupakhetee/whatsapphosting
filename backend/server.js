@@ -106,7 +106,7 @@ const initializeWhatsAppOnStartup = async () => {
         console.error('Failed to initialize WhatsApp client on startup:', error);
     }
 };
-initializeWhatsAppOnStartup();
+
 
 // Initialize WhatsApp client
 const initializeWhatsApp = async () => {
@@ -214,6 +214,10 @@ const initializeWhatsApp = async () => {
         isInitializing = false;
     }
 };
+
+initializeWhatsAppOnStartup();
+
+
 // Reset client
 const resetClient = async () => {
   if (client) {
