@@ -597,8 +597,11 @@ app.get("/api/reset", async (req, res) => {
 const disconnectAndUnlink = async () => {
   if (client && isClientReady) {
     try {
-      // Unlink from WhatsApp Web (removes from linked devices)
-      await client.logout();
+      // Check if the browser is still open
+      if (browser && browser.isConnected()) {
+        // Unlink from WhatsApp Web (removes from linked devices)
+        await client.logout();
+      }
 
       // Destroy the client
       await client.destroy();
