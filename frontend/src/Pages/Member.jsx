@@ -14,6 +14,8 @@ const Member = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [searchCategory, setSearchCategory] = useState('Name of Ledger');
+    const [bulkUpdateCategory, setBulkUpdateCategory] = useState('');
+    const [bulkUpdatePhoneNumber, setBulkUpdatePhoneNumber] = useState('');
 
     // Predefined under options with phone numbers
     const underOptions = [
@@ -22,7 +24,7 @@ const Member = () => {
         { under_value: "Sundry Debtors Gpl", phone_number: "9744306601" },
         { under_value: "Sundry Debtors Mukesh Ji", phone_number: "9863035521" },
         { under_value: "Sundry Debtors Rajiv Ji", phone_number: "9863811729" },
-        { under_value: "Sundry Debtors Vinod Ji", phone_number: "9744306601" },
+        { under_value: "Sundry Debtors Vinod Ji", phone_number: "9862239703" },
         { under_value: "Sundry Debtors Vishal Ji", phone_number: "9844781086" }
     ];
 
@@ -54,17 +56,7 @@ const Member = () => {
     // Handle input changes for form
     const handleChange = (e) => {
         const { name, value } = e.target;
-        if (name === "Under") {
-            // Find the corresponding phone number for the selected under value
-            const selectedOption = underOptions.find(option => option.under_value === value);
-            setFormData({
-                ...formData,
-                [name]: value,
-                phone_number: selectedOption ? selectedOption.phone_number : ''
-            });
-        } else {
-            setFormData({ ...formData, [name]: value });
-        }
+        setFormData({ ...formData, [name]: value });
     };
 
     // Add or update member
@@ -79,6 +71,38 @@ const Member = () => {
             }
             setFormData({ "Name of Ledger": '', "Under": '', "phone_number": '' });
             fetchMembers();
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Bulk update phone numbers for a specific category
+    const handleBulkUpdate = async () => {
+        try {
+            // Filter members with the selected category
+            const membersToUpdate = members.filter(
+                member => member.Under === bulkUpdateCategory
+            );
+
+            // Perform bulk update
+            const updatePromises = membersToUpdate.map(member => 
+                axios.put(`${baseURL}/${member._id}`, {
+                    ...member,
+                    phone_number: bulkUpdatePhoneNumber
+                })
+            );
+
+            await Promise.all(updatePromises);
+            
+            // Refresh members list
+            fetchMembers();
+
+            // Reset bulk update fields
+            setBulkUpdateCategory('');
+            setBulkUpdatePhoneNumber('');
+
+            // Show success message
+            alert(`Updated ${membersToUpdate.length} members in the ${bulkUpdateCategory} category`);
         } catch (err) {
             setError(err.message);
         }
@@ -127,6 +151,37 @@ const Member = () => {
                 />
             </div>
 
+            {/* Bulk Update Section */}
+            <div className="bulk-update-container">
+                <h2>Bulk Phone Number Update</h2>
+                <select
+                    value={bulkUpdateCategory}
+                    onChange={(e) => setBulkUpdateCategory(e.target.value)}
+                    className="form-control"
+                >
+                    <option value="">Select Category to Update</option>
+                    {[...new Set(members.map(m => m.Under))].map((category, index) => (
+                        <option key={index} value={category}>
+                            {category}
+                        </option>
+                    ))}
+                </select>
+                <input
+                    type="text"
+                    placeholder="New Phone Number"
+                    value={bulkUpdatePhoneNumber}
+                    onChange={(e) => setBulkUpdatePhoneNumber(e.target.value)}
+                    className="form-control"
+                />
+                <button 
+                    onClick={handleBulkUpdate} 
+                    className="bulk-update-button"
+                    disabled={!bulkUpdateCategory || !bulkUpdatePhoneNumber}
+                >
+                    Bulk Update Phone Numbers
+                </button>
+            </div>
+
             <form className="member-form" onSubmit={handleSubmit}>
                 <div className="form-group">
                     <input
@@ -162,7 +217,6 @@ const Member = () => {
                         value={formData.phone_number}
                         onChange={handleChange}
                         required
-                        readOnly
                     />
                 </div>
                 <button type="submit" className="submit-button">

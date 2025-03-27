@@ -407,3 +407,119 @@ h1 {
     margin-bottom: 20px;
     text-align: center;
 }
+.bulk-update-container {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #f4f4f4;
+    border-radius: 5px;
+}
+
+.bulk-update-container h2 {
+    margin-bottom: 10px;
+}
+
+.bulk-update-button {
+    margin-top: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.bulk-update-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+/* Enhanced Dropdown Styles */
+.form-group select,
+.bulk-update-container select {
+    appearance: none; /* Remove default browser styling */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    
+    /* Custom dropdown arrow */
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M1 4l5 5 5-5z' fill='%23666' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    
+    /* Ensure the background image doesn't overlap text */
+    padding-right: 30px;
+    
+    /* Additional styling */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    color: #333;
+    font-size: 16px;
+    line-height: 1.5;
+    transition: all 0.2s ease-in-out;
+    
+    /* Ensure consistent sizing */
+    width: 100%;
+    box-sizing: border-box;
+    height: 40px;
+    cursor: pointer;
+}
+
+/* Hover and Focus States */
+.form-group select:hover,
+.bulk-update-container select:hover {
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-group select:focus,
+.bulk-update-container select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* Dropdown Options */
+.form-group select option,
+.bulk-update-container select option {
+    padding: 10px;
+    background-color: white;
+    color: #333;
+}
+
+/* Disabled State */
+.form-group select:disabled,
+.bulk-update-container select:disabled {
+    background-color: #f4f4f4;
+    color: #888;
+    cursor: not-allowed;
+    border-color: #ccc;
+}
+
+/* Placeholder Option Styling */
+.form-group select option[value=""] {
+    color: #888;
+    font-style: italic;
+}
+
+/* Bulk Update Dropdown Specific Styles */
+.bulk-update-container select {
+    margin-bottom: 10px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 600px) {
+    .form-group select,
+    .bulk-update-container select {
+        font-size: 14px;
+        padding-right: 25px;
+        height: 35px;
+    }
+}
+
+@media (max-width: 400px) {
+    .form-group select,
+    .bulk-update-container select {
+        font-size: 12px;
+        padding-right: 20px;
+        height: 30px;
+    }
+}
