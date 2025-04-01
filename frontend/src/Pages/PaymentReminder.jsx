@@ -11,6 +11,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import '../Styles/PaymentReminder.css';
 import phoneNumberData from '../PaymentReminder.json';
 import LoadingSpinner from '../Components/LoadingSpinner';
+import nepaliDateConverter from 'nepali-date-converter';
+
 
 
 const PaymentReminder = () => {
@@ -55,55 +57,42 @@ const PaymentReminder = () => {
 
 
   const consolidateMessages = (whatsappMessages) => {
-    // Group messages by phone number (manager)
     const groupedByManager = whatsappMessages.reduce((acc, message) => {
       const phoneNumber = message.phoneNumber;
       if (!phoneNumber) return acc;
-      
       if (!acc[phoneNumber]) {
         acc[phoneNumber] = {
           parties: [],
           totalAmount: 0
         };
       }
-      
       acc[phoneNumber].parties.push({
         partyName: message.partyName,
         outstandingAmount: parseFloat(message.outstandingAmount.replace(/,/g, '')),
-        details: message.detailedContent
+        details: message.detailedContent // Ensure miti is included here
       });
-      
       acc[phoneNumber].totalAmount += parseFloat(message.outstandingAmount.replace(/,/g, ''));
-      
       return acc;
     }, {});
-
-    // Format consolidated messages
+  
     return Object.entries(groupedByManager).map(([phoneNumber, data]) => {
       const message = `Dear Manager,
-
-This is a consolidated report of pending payments for all parties under your supervision:
-
-${data.parties.map(party => `
-== ${party.partyName} ==
-Outstanding Amount: NPR ${party.outstandingAmount.toLocaleString('en-IN', {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2
-})}
-
-Detailed Transactions:
-${party.details}
-`).join('\n')}
-
-Total Outstanding Amount for All Parties: NPR ${data.totalAmount.toLocaleString('en-IN', {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2
-})}
-
-Please follow up with the respective parties for payment collection.
-
-Thank you for your cooperation.`;
-
+  This is a consolidated report of pending payments for all parties under your supervision:
+  ${data.parties.map(party => `
+  == ${party.partyName} ==
+  Outstanding Amount: NPR ${party.outstandingAmount.toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2
+  })}
+  Detailed Transactions:
+  ${party.details}
+  `).join('\n')}
+  Total Outstanding Amount for All Parties: NPR ${data.totalAmount.toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2
+  })}
+  Please follow up with the respective parties for payment collection.
+  Thank you for your cooperation.`;
       return {
         country_code: '977',
         number: phoneNumber.replace(/\D/g, ''),
@@ -144,7 +133,7 @@ Thank you for your cooperation.`;
     let formattedEntries = [];
     let currentParty = null;
     let missingParties = new Set();
-    
+  
     try {
       const excelSerialToDate = (serial) => {
         if (!serial) return '';
@@ -168,7 +157,7 @@ Thank you for your cooperation.`;
         return contact ? contact.phone_number : null;
       };
   
-      const dateRangeKey = Object.keys(jsonData[0]).find(key => 
+      const dateRangeKey = Object.keys(jsonData[0]).find(key =>
         key.toLowerCase().includes('bills receivable')
       );
   
@@ -180,11 +169,10 @@ Thank you for your cooperation.`;
   
         if (row[dateRangeKey] && typeof row[dateRangeKey] === 'number' && row.__EMPTY_3) {
           const phoneNumber = getPhoneNumber(currentParty);
-          
           if (!phoneNumber) {
             missingParties.add(currentParty);
           }
-          
+  
           // Get the last column value for "send message"
           const values = Object.values(row);
           const sendMessage = values[values.length - 1];
@@ -196,11 +184,14 @@ Thank you for your cooperation.`;
               partyName: currentParty,
               phoneNumber: phoneNumber,
               date: excelSerialToDate(row[dateRangeKey]),
-              miti: row.__EMPTY || '',
+              miti: row.__EMPTY || '', // Original Nepali date
               refNo: row.__EMPTY_1 || '',
               pendingAmount: parseFloat(row.__EMPTY_3) || 0,
               finalBalance: row.__EMPTY_4 ? parseFloat(row.__EMPTY_4) : 0,
-              dueOn: row.__EMPTY_5 ? excelSerialToDate(row.__EMPTY_5) : '',
+              dueOn: {
+                nepaliDate: row.__EMPTY || '', // Original Nepali date
+                englishDate: excelSerialToDate(row.__EMPTY_5) || '' // Converted English date
+              },
               ageOfBill: row.__EMPTY_6 || '',
               chequeReceivedOn: chequeReceivedOn ? excelSerialToDate(chequeReceivedOn) : '',
               sendMessage: sendMessage
@@ -217,15 +208,15 @@ Thank you for your cooperation.`;
     } finally {
       setIsPhoneNumberProcessing(false);
     }
+  
     return formattedEntries;
   };
-
 
 
   const prepareWhatsAppData = (formattedEntries) => {
     const filteredEntries = formattedEntries.filter(entry => {
       const age = parseInt(entry.ageOfBill, 10);
-      return !isNaN(age) && age > 90;
+      return !isNaN(age); // Remove the > 90 restriction
     });
   
     const groupedByParty = filteredEntries.reduce((acc, entry) => {
@@ -245,17 +236,18 @@ Thank you for your cooperation.`;
       const totalPending = partyData.entries
         .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
   
-      const detailedContent = partyData.entries.map(entry => 
-        `Bill Date: ${entry.date}\n` +
-        `Reference: ${entry.refNo}\n` +
-        `Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+      const detailedContent = partyData.entries.map(entry =>
+        `Bill Date: ${entry.date} (English)
+  Miti: ${entry.miti} (Nepali)
+  Reference: ${entry.refNo}
+  Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
           maximumFractionDigits: 2,
           minimumFractionDigits: 2
-        })}\n` +
-        `Due Date: ${entry.dueOn}\n` +
-        `Days Overdue: ${entry.ageOfBill}\n` +
-        (entry.chequeReceivedOn ? `Cheque Received On: ${entry.chequeReceivedOn}\n` : '') +
-        '----------------------------------------'
+        })}
+  Due Date: ${entry.dueOn.nepaliDate} (Nepali), ${entry.dueOn.englishDate} (English)
+  Days Overdue: ${entry.ageOfBill}
+  ${entry.chequeReceivedOn ? `Cheque Received On: ${entry.chequeReceivedOn}\n` : ''}
+  ----------------------------------------`
       ).join('\n');
   
       return {
@@ -274,91 +266,81 @@ Thank you for your cooperation.`;
 
 
 
-const handleFileUpload = (files) => {
-  const file = files[0];
-  const reader = new FileReader();
-
-  reader.onload = (e) => {
-    try {
-      const data = e.target.result;
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        raw: true,
-        defval: ''
-      });
-
-      console.log('Raw Excel Data:', jsonData);
-
-      const formattedData = formatData(jsonData);
-      setParsedData(formattedData);
-
-      const summaries = prepareWhatsAppData(formattedData);
-      if (summaries.length === 0) {
-        setStatus('No bills found that are more than 90 days overdue');
-        toast.info('No bills found that are more than 90 days overdue');
-      } else {
-        setStatus(`Found ${summaries.length} parties with bills over 90 days overdue`);
-        setWhatsappMessages(summaries);
-      }
-
-
-      // Group the data by party and include phone numbers
-      const groupedData = formattedData.reduce((acc, entry) => {
-        if (!acc[entry.partyName]) {
-          acc[entry.partyName] = {
-            entries: [],
-            phoneNumber: entry.phoneNumber // Store the phone number at the party level
-          };
+  const handleFileUpload = (files) => {
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          raw: true,
+          defval: ''
+        });
+  
+        console.log('Raw Excel Data:', jsonData);
+        const formattedData = formatData(jsonData);
+        setParsedData(formattedData);
+  
+        const summaries = prepareWhatsAppData(formattedData);
+        if (summaries.length === 0) {
+          setStatus('No bills found');
+          toast.info('No bills found');
+        } else {
+          setStatus(`Found ${summaries.length} parties`);
+          setWhatsappMessages(summaries);
         }
-        acc[entry.partyName].entries.push(entry);
-        return acc;
-      }, {});
-
-      // Create formatted text for display
-      const text = Object.entries(groupedData).map(([partyName, partyData]) => {
-        const entriesText = partyData.entries.map(entry =>
-          `Date: ${entry.date}\n` +
-          `Miti: ${entry.miti}\n` +
-          `Ref No: ${entry.refNo}\n` +
-          `Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2
-          })}\n` +
-          `Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2
-          })}\n` +
-          `Due on: ${entry.dueOn}\n` +
-          (entry.ageOfBill ? `Age of Bill: ${entry.ageOfBill} days\n` : '') +
-          '----------------------------------------'
-        ).join('\n\n');
-
-        return (
-          `Party's Name: ${partyName}\n` +
-          `Phone Number: ${partyData.phoneNumber || 'Not found'}\n` +
-          '========================================\n\n' +
-          entriesText
-        );
-      }).join('\n\n\n');
-
-      setFormattedText(text || 'No data loaded');
-      setStatus('File processed successfully');
-      setError('');
-      
-      console.log('Formatted Text:', text);
-      // Also log the phone number data for debugging
-      console.log('Phone Number Data:', phoneNumberData);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      setError('Error processing file: ' + error.message);
-      setFormattedText('Error processing file');
-    }
+  
+        const groupedData = formattedData.reduce((acc, entry) => {
+          if (!acc[entry.partyName]) {
+            acc[entry.partyName] = {
+              entries: [],
+              phoneNumber: entry.phoneNumber
+            };
+          }
+          acc[entry.partyName].entries.push(entry);
+          return acc;
+        }, {});
+  
+        const text = Object.entries(groupedData).map(([partyName, partyData]) => {
+          const entriesText = partyData.entries.map(entry =>
+            `Date: ${entry.date} (English)
+  Miti: ${entry.miti} (Nepali)
+  Ref No: ${entry.refNo}
+  Pending Amount: ${entry.pendingAmount.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+            })}
+  Final Balance: ${entry.finalBalance.toLocaleString('en-IN', {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2
+            })}
+  Due on: ${entry.dueOn.nepaliDate} (Nepali), ${entry.dueOn.englishDate} (English)
+  Age of Bill: ${entry.ageOfBill} days
+  ----------------------------------------`
+          ).join('\n');
+          return (
+            `Party's Name: ${partyName}
+  Phone Number: ${partyData.phoneNumber || 'Not found'}
+  ========================================
+  ${entriesText}`
+          );
+        }).join('\n');
+  
+        setFormattedText(text || 'No data loaded');
+        setStatus('File processed successfully');
+        setError('');
+        console.log('Formatted Text:', text);
+      } catch (error) {
+        console.error('Error processing file:', error);
+        setError('Error processing file: ' + error.message);
+        setFormattedText('Error processing file');
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
-
-  reader.readAsArrayBuffer(file);
-};
 
 
 const generateQR = useCallback(async () => {
