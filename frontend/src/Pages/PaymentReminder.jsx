@@ -233,30 +233,31 @@ const PaymentReminder = () => {
     const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
       if (partyData.entries.length === 0) return null;
   
-      const totalPending = partyData.entries
-        .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0);
-  
       const detailedContent = partyData.entries.map(entry =>
-        `Bill Date: ${entry.date} (English)
-  Miti: ${entry.miti} (Nepali)
-  Reference: ${entry.refNo}
-  Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+        `==== ${partyName} =====
+  Bill Date: ${entry.date} (English)
+  Bill Miti: ${entry.miti} (Nepali)
+  Opening Amount: NPR ${entry.finalBalance.toLocaleString('en-IN', {
           maximumFractionDigits: 2,
           minimumFractionDigits: 2
         })}
-  Due Date: ${entry.dueOn.nepaliDate} (Nepali), ${entry.dueOn.englishDate} (English)
+  Pending Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        })}
   Days Overdue: ${entry.ageOfBill}
-  ${entry.chequeReceivedOn ? `Cheque Received On: ${entry.chequeReceivedOn}\n` : ''}
-  ----------------------------------------`
+  ----------------------------`
       ).join('\n');
   
       return {
         partyName,
         phoneNumber: partyData.phoneNumber,
-        outstandingAmount: totalPending.toLocaleString('en-IN', {
-          maximumFractionDigits: 2,
-          minimumFractionDigits: 2
-        }),
+        outstandingAmount: partyData.entries
+          .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0)
+          .toLocaleString('en-IN', {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 2
+          }),
         detailedContent
       };
     }).filter(Boolean);
