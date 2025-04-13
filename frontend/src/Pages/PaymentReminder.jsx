@@ -69,7 +69,7 @@ const PaymentReminder = () => {
       acc[phoneNumber].parties.push({
         partyName: message.partyName,
         outstandingAmount: parseFloat(message.outstandingAmount.replace(/,/g, '')),
-        details: message.detailedContent // Ensure miti is included here
+        details: message.detailedContent // Contains the formatted details
       });
       acc[phoneNumber].totalAmount += parseFloat(message.outstandingAmount.replace(/,/g, ''));
       return acc;
@@ -79,12 +79,6 @@ const PaymentReminder = () => {
       const message = `Dear Manager,
   This is a consolidated report of pending payments for all parties under your supervision:
   ${data.parties.map(party => `
-  == ${party.partyName} ==
-  Outstanding Amount: NPR ${party.outstandingAmount.toLocaleString('en-IN', {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2
-  })}
-  Detailed Transactions:
   ${party.details}
   `).join('\n')}
   Total Outstanding Amount for All Parties: NPR ${data.totalAmount.toLocaleString('en-IN', {
@@ -233,31 +227,43 @@ const PaymentReminder = () => {
     const summaries = Object.entries(groupedByParty).map(([partyName, partyData]) => {
       if (partyData.entries.length === 0) return null;
   
+      // Calculate total outstanding amount for this party
+      const totalOutstanding = partyData.entries
+        .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0)
+        .toLocaleString('en-IN', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        });
+  
+      // Format each entry according to the new structure
       const detailedContent = partyData.entries.map(entry =>
-        `==== ${partyName} =====
-  Bill Date: ${entry.date} (English)
-  Bill Miti: ${entry.miti} (Nepali)
-  Opening Amount: NPR ${entry.finalBalance.toLocaleString('en-IN', {
+        `Party's Name: ${partyName}
+  Due Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
           maximumFractionDigits: 2,
           minimumFractionDigits: 2
         })}
+  Age of Bill: ${entry.ageOfBill} days
+  Phone Number: ${partyData.phoneNumber || 'Not available'}
+  Date (English): ${entry.date}
+  Miti (Nepali): ${entry.miti}
+  Ref No: ${entry.refNo}
   Pending Amount: NPR ${entry.pendingAmount.toLocaleString('en-IN', {
           maximumFractionDigits: 2,
           minimumFractionDigits: 2
         })}
-  Days Overdue: ${entry.ageOfBill}
+  Final Balance: NPR ${entry.finalBalance.toLocaleString('en-IN', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        })}
+  Due On (English): ${entry.dueOn.englishDate}
+  Due On (Nepali): ${entry.dueOn.nepaliDate}
   ----------------------------`
       ).join('\n');
   
       return {
         partyName,
         phoneNumber: partyData.phoneNumber,
-        outstandingAmount: partyData.entries
-          .reduce((sum, e) => sum + (parseFloat(e.pendingAmount) || 0), 0)
-          .toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2
-          }),
+        outstandingAmount: totalOutstanding,
         detailedContent
       };
     }).filter(Boolean);
